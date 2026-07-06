@@ -24,18 +24,24 @@ tipologia = st.sidebar.selectbox("Tipologia", ["Residenziale", "Commerciale", "U
 prezzo_range = st.sidebar.slider("Range Prezzo Ricerca (€)", 0, 1000000, (50000, 300000), step=5000)
 
 st.sidebar.markdown("---")
-st.sidebar.caption("GECO Engine v1.2 - Motore di Scouting")
+st.sidebar.caption("GECO Engine v1.3 - Motore di Scouting")
 
 # -----------------------------------------
-# MAIN: INPUT EDITABILI E PARAMETRI FINANZIARI
+# MAIN: TARGET RENDIMENTO E PARAMETRI
 # -----------------------------------------
 st.title("🚀 GECO Screening Engine")
-st.markdown("##### Parametri Finanziari e Costi")
 
+# Parametro in forte risalto
+st.markdown("### 🎯 Target Strategico")
+col_target, _ = st.columns([1, 3])
+with col_target:
+    plusvalore_atteso_perc = st.number_input("🌟 PLUSVALORE ATTESO (%)", value=20.0, step=1.0) / 100
+
+st.markdown("##### Parametri Finanziari e Costi")
 col1, col2, col3, col4 = st.columns(4)
 param_prezzo = col1.number_input("Costo Base Ristr. (€/mq)", value=800, step=50)
 imposta_perc = col2.number_input("Imposta Registro (%)", value=2.0, step=0.5) / 100
-notaio_euro = col3.number_input("Notaio (€)", value=2500, step=100) # Modificato in Euro
+notaio_euro = col3.number_input("Notaio (€)", value=2500, step=100)
 agenzia_acq_perc = col4.number_input("Agenzia Acquisto (%)", value=3.0, step=0.5) / 100
 
 col5, col6, col7, col8 = st.columns(4)
@@ -49,19 +55,16 @@ st.markdown("---")
 # -----------------------------------------
 # DATABASE FITTIZIO (In attesa di Playwright)
 # -----------------------------------------
-# Aggiunta colonna Link
-if 'dati_mock' not in st.session_state:
-    st.session_state.dati_mock = pd.DataFrame({
-        'Comune': ['Padova', 'Padova', 'Vigodarzere', 'Padova', 'Padova'],
-        'Zona': ['Centro Storico', 'Centro Storico', 'Sacra Famiglia', 'Portello', 'Centro Storico'],
-        'Tipologia': ['Residenziale', 'Residenziale', 'Residenziale', 'Residenziale', 'Residenziale'],
-        'Superficie': [100, 150, 120, 70, 90],
-        'Prezzo_J': [150000, 450000, 180000, 95000, 220000],
-        'Ipotesi_Vendita_U': [240000, 580000, 290000, 155000, 310000],
-        'Link': ['https://www.immobiliare.it/1', 'https://www.immobiliare.it/2', 'https://www.immobiliare.it/3', 'https://www.immobiliare.it/4', 'https://www.immobiliare.it/5']
-    })
-
-df = st.session_state.dati_mock
+# Rimossa la colonna 'Ipotesi_Vendita_U' dai dati grezzi, ora è calcolata
+data = {
+    'Comune': ['Padova', 'Padova', 'Vigodarzere', 'Padova', 'Padova'],
+    'Zona': ['Centro Storico', 'Centro Storico', 'Sacra Famiglia', 'Portello', 'Centro Storico'],
+    'Tipologia': ['Residenziale', 'Residenziale', 'Residenziale', 'Residenziale', 'Residenziale'],
+    'Superficie': [100, 150, 120, 70, 90],
+    'Prezzo_J': [150000, 450000, 180000, 95000, 220000],
+    'Link': ['https://www.immobiliare.it/1', 'https://www.immobiliare.it/2', 'https://www.immobiliare.it/3', 'https://www.immobiliare.it/4', 'https://www.immobiliare.it/5']
+}
+df = pd.DataFrame(data)
 
 # -----------------------------------------
 # MOTORE DI CALCOLO PANDAS
@@ -69,23 +72,25 @@ df = st.session_state.dati_mock
 def calculate_metrics(df_calc):
     df_calc = df_calc.copy()
     
-    # Ristrutturazione
+    # 1. Ristrutturazione
     df_calc['Costo_Ristr_P'] = df_calc['Superficie'] * param_prezzo
     df_calc['Costi_Tecnici_Val'] = df_calc['Costo_Ristr_P'] * costi_tecnici_perc
     df_calc['Imprevisti_Val'] = df_calc['Costo_Ristr_P'] * imprevisti_perc
     df_calc['Costo_Ristr_Totale'] = df_calc['Costo_Ristr_P'] + df_calc['Costi_Tecnici_Val'] + df_calc['Imprevisti_Val']
 
-    # Acquisto
+    # 2. Acquisto
     df_calc['Imposta'] = df_calc['Prezzo_J'] * imposta_perc
-    df_calc['Notaio'] = notaio_euro # Valore fisso in Euro
+    df_calc['Notaio'] = notaio_euro
     df_calc['Agenzia_Acq'] = df_calc['Prezzo_J'] * agenzia_acq_perc
     df_calc['Costo_Acquisto_Totale'] = df_calc['Prezzo_J'] + df_calc['Imposta'] + df_calc['Notaio'] + df_calc['Agenzia_Acq']
 
-    # Vendita
+    # 3. Ipotesi Vendita (CALCOLO DA TARGET)
+    df_calc['Ipotesi_Vendita_U'] = (df_calc['Costo_Acquisto_Totale'] + df_calc['Costo_Ristr_Totale']) * (1 + plusvalore_atteso_perc)
+
+    # 4. Costi in Uscita e Utile
     df_calc['Agenzia_Vendita_Val'] = df_calc['Ipotesi_Vendita_U'] * agenzia_ven_perc
     df_calc['Interessi_Val'] = df_calc['Costo_Acquisto_Totale'] * interessi_perc
 
-    # Utile Lordo
     df_calc['Utile_Lordo'] = (
         df_calc['Ipotesi_Vendita_U'] 
         - df_calc['Costo_Acquisto_Totale'] 
@@ -112,7 +117,6 @@ df_final_filtered = df_geo_filtered[mask_price].copy()
 st.write("### Risultati Analisi")
 
 if not df_final_filtered.empty:
-    # Calcolo iniziale per popolare la tabella
     df_calculated = calculate_metrics(df_final_filtered)
     
     colonne_display = [
@@ -121,30 +125,20 @@ if not df_final_filtered.empty:
         'Ipotesi_Vendita_U', 'Utile_Lordo', 'Link'
     ]
     
-    st.caption("💡 *Doppio clic sulla cella **Ipotesi Vendita_U** per modificare il valore e ricalcolare l'Utile Lordo.*")
-    
-    # Renderizza la tabella editabile
-    edited_df = st.data_editor(
+    # Renderizza la tabella fissa usando st.dataframe con column_config per la formattazione
+    st.dataframe(
         df_calculated[colonne_display],
         column_config={
-            "Ipotesi_Vendita_U": st.column_config.NumberColumn("Ipotesi Vendita (€)", format="€ %d", step=5000),
-            "Prezzo_J": st.column_config.NumberColumn("Prezzo Acquisto (€)", format="€ %d"),
-            "Costo_Acquisto_Totale": st.column_config.NumberColumn("Costo Acquisto (€)", format="€ %d"),
-            "Costo_Ristr_Totale": st.column_config.NumberColumn("Costo Ristrutturazione (€)", format="€ %d"),
-            "Utile_Lordo": st.column_config.NumberColumn("Utile Lordo (€)", format="€ %d"),
+            "Ipotesi_Vendita_U": st.column_config.NumberColumn("Target Vendita (€)", format="€ %.2f"),
+            "Prezzo_J": st.column_config.NumberColumn("Prezzo Acquisto (€)", format="€ %.2f"),
+            "Costo_Acquisto_Totale": st.column_config.NumberColumn("Costo Acquisto Tot. (€)", format="€ %.2f"),
+            "Costo_Ristr_Totale": st.column_config.NumberColumn("Costo Ristr. Tot. (€)", format="€ %.2f"),
+            "Utile_Lordo": st.column_config.NumberColumn("Utile Lordo (€)", format="€ %.2f"),
             "Link": st.column_config.LinkColumn("Pagina Web", display_text="Apri Annuncio")
         },
-        disabled=["Comune", "Zona", "Superficie", "Prezzo_J", "Costo_Acquisto_Totale", "Costo_Ristr_Totale", "Utile_Lordo", "Link"],
         use_container_width=True,
         hide_index=True
     )
-    
-    # Se l'utente modifica l'ipotesi di vendita, ricalcola e aggiorna silenziosamente la vista
-    if not edited_df.equals(df_calculated[colonne_display]):
-        # Aggiorna i dati nel session state per mantenere la modifica
-        for idx in edited_df.index:
-            st.session_state.dati_mock.loc[idx, 'Ipotesi_Vendita_U'] = edited_df.loc[idx, 'Ipotesi_Vendita_U']
-        st.rerun()
 
 else:
     st.info("Nessun immobile trovato nel range di prezzo indicato per i filtri selezionati.")
@@ -152,27 +146,27 @@ else:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # -----------------------------------------
-# BENCHMARK DI MERCATO (Prezzo Medio Zona)
+# BENCHMARK DI MERCATO (Target di Zona)
 # -----------------------------------------
 if not df_geo_filtered.empty:
-    # Calcolo prezzi medi assoluti
-    prezzo_medio_richiesta = df_geo_filtered['Prezzo_J'].mean()
-    prezzo_medio_vendita = df_geo_filtered['Ipotesi_Vendita_U'].mean()
+    # Calcolo su tutto il dataset geografico (ignora range di prezzo) per creare il benchmark
+    df_geo_calculated = calculate_metrics(df_geo_filtered)
     
-    # Calcolo prezzi medi al mq
-    prezzo_medio_mq_richiesta = (df_geo_filtered['Prezzo_J'] / df_geo_filtered['Superficie']).mean()
-    prezzo_medio_mq_vendita = (df_geo_filtered['Ipotesi_Vendita_U'] / df_geo_filtered['Superficie']).mean()
+    prezzo_medio_richiesta = df_geo_calculated['Prezzo_J'].mean()
+    prezzo_medio_vendita = df_geo_calculated['Ipotesi_Vendita_U'].mean()
     
-    st.markdown("### Benchmark di Mercato (Area Selezionata)")
+    prezzo_medio_mq_richiesta = (df_geo_calculated['Prezzo_J'] / df_geo_calculated['Superficie']).mean()
+    prezzo_medio_mq_vendita = (df_geo_calculated['Ipotesi_Vendita_U'] / df_geo_calculated['Superficie']).mean()
+    
+    st.markdown("### Benchmark Target Area (Basato sul Plusvalore)")
     st.write(f"*Dato calcolato sui filtri geografici e tipologia, escludendo il range di prezzo di ricerca.*")
     
     col_bench1, col_bench2 = st.columns(2)
     
-    # Formattazione HTML per rendere il prezzo totale più piccolo e il valore €/mq ben visibile
     with col_bench1:
-        st.markdown(f"**Acquisto (Richiesta)**<br><span style='font-size: 1.2rem;'>**€ {prezzo_medio_mq_richiesta:,.0f} / mq**</span><br><span style='font-size: 0.9rem; color: #a1a1aa;'>Totale medio: € {prezzo_medio_richiesta:,.0f}</span>", unsafe_allow_html=True)
+        st.markdown(f"**Acquisto (Media Richiesta)**<br><span style='font-size: 1.2rem;'>**€ {prezzo_medio_mq_richiesta:,.0f} / mq**</span><br><span style='font-size: 0.9rem; color: #a1a1aa;'>Totale medio: € {prezzo_medio_richiesta:,.0f}</span>", unsafe_allow_html=True)
         
     with col_bench2:
-        st.markdown(f"**Vendita (Finito)**<br><span style='font-size: 1.2rem; color: #10b981;'>**€ {prezzo_medio_mq_vendita:,.0f} / mq**</span><br><span style='font-size: 0.9rem; color: #a1a1aa;'>Totale medio: € {prezzo_medio_vendita:,.0f}</span>", unsafe_allow_html=True)
+        st.markdown(f"**Target Vendita (Finito)**<br><span style='font-size: 1.2rem; color: #10b981;'>**€ {prezzo_medio_mq_vendita:,.0f} / mq**</span><br><span style='font-size: 0.9rem; color: #a1a1aa;'>Totale medio: € {prezzo_medio_vendita:,.0f}</span>", unsafe_allow_html=True)
 else:
     st.warning("Dati insufficienti nell'area selezionata per calcolare il benchmark di mercato.")
