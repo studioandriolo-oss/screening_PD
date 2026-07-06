@@ -90,10 +90,3 @@ else:
 
 st.markdown("---")
 st.caption("GECO Engine v1.0 - Sviluppato per scouting immobiliare professionale.")
-
-### Prossimi Passi:
-1. **GitHub:** Crea un nuovo repository, carica `app.py` e il logo `geco_logo.png`.
-2. **Streamlit Cloud:** Collega il repository per rendere l'app accessibile online.
-3. **Fase 2:** Quando sei pronto, procederemo con l'integrazione di **Playwright** per iniziare a pescare i dati reali da Immobiliare.it.
-
-Ti piace come sta prendendo forma l'interfaccia?
