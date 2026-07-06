@@ -4,6 +4,18 @@ import numpy as np
 from PIL import Image
 
 # -----------------------------------------
+# FUNZIONE FORMATTAZIONE EURO (Formato Italiano)
+# -----------------------------------------
+def format_euro(val):
+    if pd.isna(val):
+        return "€ 0,00"
+    # Formatta con standard anglosassone (es. 1,000,000.00)
+    val_str = f"{val:,.2f}"
+    # Sostituisce virgole con X, punti con virgole, e X con punti -> 1.000.000,00
+    val_str = val_str.replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"€ {val_str}"
+
+# -----------------------------------------
 # CONFIGURAZIONE PAGINA
 # -----------------------------------------
 st.set_page_config(page_title="GECO Immobiliare - Screening Engine", layout="wide")
@@ -24,7 +36,7 @@ tipologia = st.sidebar.selectbox("Tipologia", ["Residenziale", "Commerciale", "U
 prezzo_range = st.sidebar.slider("Range Prezzo Ricerca (€)", 0, 1000000, (50000, 300000), step=5000)
 
 st.sidebar.markdown("---")
-st.sidebar.caption("GECO Engine v1.3 - Motore di Scouting")
+st.sidebar.caption("GECO Engine v1.4 - Motore di Scouting")
 
 # -----------------------------------------
 # MAIN: TARGET RENDIMENTO E PARAMETRI
@@ -55,7 +67,6 @@ st.markdown("---")
 # -----------------------------------------
 # DATABASE FITTIZIO (In attesa di Playwright)
 # -----------------------------------------
-# Rimossa la colonna 'Ipotesi_Vendita_U' dai dati grezzi, ora è calcolata
 data = {
     'Comune': ['Padova', 'Padova', 'Vigodarzere', 'Padova', 'Padova'],
     'Zona': ['Centro Storico', 'Centro Storico', 'Sacra Famiglia', 'Portello', 'Centro Storico'],
@@ -125,15 +136,26 @@ if not df_final_filtered.empty:
         'Ipotesi_Vendita_U', 'Utile_Lordo', 'Link'
     ]
     
-    # Renderizza la tabella fissa usando st.dataframe con column_config per la formattazione
+    # Creiamo una copia del dataframe per la visualizzazione formattata
+    df_display = df_calculated[colonne_display].copy()
+    
+    # Applichiamo la formattazione italiana alle colonne valutarie
+    colonne_valuta = ['Prezzo_J', 'Costo_Acquisto_Totale', 'Costo_Ristr_Totale', 'Ipotesi_Vendita_U', 'Utile_Lordo']
+    for col in colonne_valuta:
+        df_display[col] = df_display[col].apply(format_euro)
+    
+    # Rinominiamo le colonne per una migliore leggibilità nella UI
+    df_display = df_display.rename(columns={
+        'Prezzo_J': 'Prezzo Acquisto',
+        'Costo_Acquisto_Totale': 'Costo Acquisto Tot.',
+        'Costo_Ristr_Totale': 'Costo Ristr. Tot.',
+        'Ipotesi_Vendita_U': 'Target Vendita',
+        'Utile_Lordo': 'Utile Lordo'
+    })
+
     st.dataframe(
-        df_calculated[colonne_display],
+        df_display,
         column_config={
-            "Ipotesi_Vendita_U": st.column_config.NumberColumn("Target Vendita (€)", format="€ %.2f"),
-            "Prezzo_J": st.column_config.NumberColumn("Prezzo Acquisto (€)", format="€ %.2f"),
-            "Costo_Acquisto_Totale": st.column_config.NumberColumn("Costo Acquisto Tot. (€)", format="€ %.2f"),
-            "Costo_Ristr_Totale": st.column_config.NumberColumn("Costo Ristr. Tot. (€)", format="€ %.2f"),
-            "Utile_Lordo": st.column_config.NumberColumn("Utile Lordo (€)", format="€ %.2f"),
             "Link": st.column_config.LinkColumn("Pagina Web", display_text="Apri Annuncio")
         },
         use_container_width=True,
@@ -149,7 +171,6 @@ st.markdown("<br>", unsafe_allow_html=True)
 # BENCHMARK DI MERCATO (Target di Zona)
 # -----------------------------------------
 if not df_geo_filtered.empty:
-    # Calcolo su tutto il dataset geografico (ignora range di prezzo) per creare il benchmark
     df_geo_calculated = calculate_metrics(df_geo_filtered)
     
     prezzo_medio_richiesta = df_geo_calculated['Prezzo_J'].mean()
@@ -164,9 +185,9 @@ if not df_geo_filtered.empty:
     col_bench1, col_bench2 = st.columns(2)
     
     with col_bench1:
-        st.markdown(f"**Acquisto (Media Richiesta)**<br><span style='font-size: 1.2rem;'>**€ {prezzo_medio_mq_richiesta:,.0f} / mq**</span><br><span style='font-size: 0.9rem; color: #a1a1aa;'>Totale medio: € {prezzo_medio_richiesta:,.0f}</span>", unsafe_allow_html=True)
+        st.markdown(f"**Acquisto (Media Richiesta)**<br><span style='font-size: 1.2rem;'>**{format_euro(prezzo_medio_mq_richiesta)} / mq**</span><br><span style='font-size: 0.9rem; color: #a1a1aa;'>Totale medio: {format_euro(prezzo_medio_richiesta)}</span>", unsafe_allow_html=True)
         
     with col_bench2:
-        st.markdown(f"**Target Vendita (Finito)**<br><span style='font-size: 1.2rem; color: #10b981;'>**€ {prezzo_medio_mq_vendita:,.0f} / mq**</span><br><span style='font-size: 0.9rem; color: #a1a1aa;'>Totale medio: € {prezzo_medio_vendita:,.0f}</span>", unsafe_allow_html=True)
+        st.markdown(f"**Target Vendita (Finito)**<br><span style='font-size: 1.2rem; color: #10b981;'>**{format_euro(prezzo_medio_mq_vendita)} / mq**</span><br><span style='font-size: 0.9rem; color: #a1a1aa;'>Totale medio: {format_euro(prezzo_medio_vendita)}</span>", unsafe_allow_html=True)
 else:
     st.warning("Dati insufficienti nell'area selezionata per calcolare il benchmark di mercato.")
