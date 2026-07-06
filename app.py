@@ -23,6 +23,10 @@ def generate_pdf_report(row, params):
     pdf.add_page()
     pdf.set_margins(15, 20, 15)
     
+    # Helper interno per bypassare l'errore Unicode di Helvetica con il simbolo Euro
+    def safe_euro(val):
+        return format_euro(val).replace("€", "EUR")
+    
     # Intestazione Professionale
     pdf.set_font("Helvetica", "B", 16)
     pdf.set_text_color(16, 185, 129) # Verde GECO
@@ -54,9 +58,9 @@ def generate_pdf_report(row, params):
     
     pdf.set_font("Helvetica", "", 10)
     pdf.cell(60, 6, f"Plusvalore Atteso: {params['plusvalore'] * 100:.1f}%", ln=False)
-    pdf.cell(60, 6, f"Costo Base Ristr.: {format_euro(params['costo_mq'])}/mq", ln=True)
+    pdf.cell(60, 6, f"Costo Base Ristr.: {safe_euro(params['costo_mq'])}/mq", ln=True)
     pdf.cell(60, 6, f"Imposta Registro: {params['imposta'] * 100:.1f}%", ln=False)
-    pdf.cell(60, 6, f"Notaio (Fisso): {format_euro(params['notaio'])}", ln=True)
+    pdf.cell(60, 6, f"Notaio (Fisso): {safe_euro(params['notaio'])}", ln=True)
     pdf.cell(60, 6, f"Agenzia Acquisto: {params['agenzia_acq'] * 100:.1f}%", ln=False)
     pdf.cell(60, 6, f"Imprevisti Ristr.: {params['imprevisti'] * 100:.1f}%", ln=True)
     pdf.cell(60, 6, f"Costi Tecnici: {params['tecnici'] * 100:.1f}%", ln=False)
@@ -66,35 +70,35 @@ def generate_pdf_report(row, params):
     
     # Sezione 3: Elaborazione Calcoli in Ordine Sequenziale
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "3. ELABORAZIONE DETTAGLIATA DEI CALCOLI (FLOW CHART LOGICO)", ln=True)
-    pdf.line(15, 123, 150, 123)
+    pdf.cell(0, 8, "3. ELABORAZIONE DETTAGLIATA DEI CALCOLI", ln=True)
+    pdf.line(15, 123, 110, 123)
     pdf.ln(4)
     
     # Tabella dei calcoli ordinati
     pdf.set_font("Helvetica", "B", 10)
     pdf.set_fill_color(241, 245, 249)
     pdf.cell(110, 8, " Voce di Spesa / Ricavo", border=1, fill=True)
-    pdf.cell(70, 8, " Valore Formattato", border=1, fill=True, align="R")
+    pdf.cell(70, 8, " Valore", border=1, fill=True, align="R")
     pdf.ln()
     
     pdf.set_font("Helvetica", "", 10)
     calcoli = [
-        ("Prezzo Immobile Oggetto di Ricerca (Colonna J)", format_euro(row['Prezzo_J'])),
-        ("  + Imposta di Registro Calcolata", format_euro(row['Imposta'])),
-        ("  + Onorario Notarile", format_euro(row['Notaio'])),
-        ("  + Commissione Agenzia in Entrata", format_euro(row['Agenzia_Acq'])),
-        ("COSTO ACQUISTO COMPLESSIVO (Colonna N)", format_euro(row['Costo_Acquisto_Totale'])),
+        ("Prezzo Immobile Oggetto di Ricerca (Col. J)", safe_euro(row['Prezzo_J'])),
+        ("  + Imposta di Registro Calcolata", safe_euro(row['Imposta'])),
+        ("  + Onorario Notarile", safe_euro(row['Notaio'])),
+        ("  + Commissione Agenzia in Entrata", safe_euro(row['Agenzia_Acq'])),
+        ("COSTO ACQUISTO COMPLESSIVO (Col. N)", safe_euro(row['Costo_Acquisto_Totale'])),
         ("----------------------------------------------------------------------", "--------------------------"),
-        ("Ipotesi Costo di Ristrutturazione Base (Colonna P)", format_euro(row['Costo_Ristr_P'])),
-        ("  + Costi Tecnici di Progettazione", format_euro(row['Costi_Tecnici_Val'])),
-        ("  + Fondo di Riserva Imprevisti", format_euro(row['Imprevisti_Val'])),
-        ("COSTO RISTRUTTURAZIONE TOTALE (Colonna T)", format_euro(row['Costo_Ristr_Totale'])),
+        ("Ipotesi Costo di Ristrutturazione Base (Col. P)", safe_euro(row['Costo_Ristr_P'])),
+        ("  + Costi Tecnici di Progettazione", safe_euro(row['Costi_Tecnici_Val'])),
+        ("  + Fondo di Riserva Imprevisti", safe_euro(row['Imprevisti_Val'])),
+        ("COSTO RISTRUTTURAZIONE TOTALE (Col. T)", safe_euro(row['Costo_Ristr_Totale'])),
         ("----------------------------------------------------------------------", "--------------------------"),
-        ("IPOTESI DI VENDITA TARGET (Colonna U)", format_euro(row['Ipotesi_Vendita_U'])),
-        ("  - Oneri Agenzia in Uscita", format_euro(row['Agenzia_Vendita_Val'])),
-        ("  - Interessi Passivi Finanziamento", format_euro(row['Interessi_Val'])),
+        ("IPOTESI DI VENDITA TARGET (Col. U)", safe_euro(row['Ipotesi_Vendita_U'])),
+        ("  - Oneri Agenzia in Uscita", safe_euro(row['Agenzia_Vendita_Val'])),
+        ("  - Interessi Passivi Finanziamento", safe_euro(row['Interessi_Val'])),
         ("----------------------------------------------------------------------", "--------------------------"),
-        ("UTILE LORDO OPERAZIONE (Colonna Y)", format_euro(row['Utile_Lordo']))
+        ("UTILE LORDO OPERAZIONE (Col. Y)", safe_euro(row['Utile_Lordo']))
     ]
     
     for voce, valore in calcoli:
@@ -111,7 +115,7 @@ def generate_pdf_report(row, params):
     pdf.output(pdf_output)
     pdf_output.seek(0)
     return pdf_output.read()
-
+    
 # -----------------------------------------
 # CONFIGURAZIONE PAGINA STREAMLIT
 # -----------------------------------------
