@@ -6,31 +6,36 @@ from fpdf import FPDF
 import io
 
 # -----------------------------------------
-# FUNZIONE FORMATTAZIONE EURO (Formato Italiano)
+# FUNZIONE FORMATTAZIONE NUMERICA (Formato Italiano)
 # -----------------------------------------
-def format_euro(val):
+def format_num_it(val):
     if pd.isna(val):
-        return "€ 0,00"
+        return "0,00"
     val_str = f"{val:,.2f}"
-    val_str = val_str.replace(",", "X").replace(".", ",").replace("X", ".")
-    return f"€ {val_str}"
+    # Inverte la separazione anglosassone in quella italiana (. per migliaia, , per decimali)
+    return val_str.replace(",", "X").replace(".", ",").replace("X", ".")
+
+def format_euro(val):
+    return f"€ {format_num_it(val)}"
 
 # -----------------------------------------
-# FUNZIONE GENERAZIONE PDF REPORT
+# FUNZIONE GENERAZIONE PDF REPORT WITH EXPLICIT EQUATIONS
 # -----------------------------------------
 def generate_pdf_report(row, params):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_margins(15, 20, 15)
     
-    # Helper interno per bypassare l'errore Unicode di Helvetica con il simbolo Euro
+    # Helper interni per pulizia stringhe e valute nel PDF
+    def clean_n(val):
+        return format_num_it(val)
     def safe_euro(val):
-        return format_euro(val).replace("€", "EUR")
+        return f"{format_num_it(val)} EUR"
     
     # Intestazione Professionale
     pdf.set_font("Helvetica", "B", 16)
     pdf.set_text_color(16, 185, 129) # Verde GECO
-    pdf.cell(0, 10, "GECO IMMOBILIARE - SCREENING REPORT", ln=True, align="C")
+    pdf.cell(0, 10, "GECO IMMOBILIARE - SCREENING REPORT DETTAGLIATO", ln=True, align="C")
     pdf.set_draw_color(16, 185, 129)
     pdf.line(15, 32, 195, 32)
     pdf.ln(10)
@@ -58,9 +63,9 @@ def generate_pdf_report(row, params):
     
     pdf.set_font("Helvetica", "", 10)
     pdf.cell(60, 6, f"Plusvalore Atteso: {params['plusvalore'] * 100:.1f}%", ln=False)
-    pdf.cell(60, 6, f"Costo Base Ristr.: {safe_euro(params['costo_mq'])}/mq", ln=True)
+    pdf.cell(60, 6, f"Costo Base Ristr.: {clean_n(params['costo_mq'])} EUR/mq", ln=True)
     pdf.cell(60, 6, f"Imposta Registro: {params['imposta'] * 100:.1f}%", ln=False)
-    pdf.cell(60, 6, f"Notaio (Fisso): {safe_euro(params['notaio'])}", ln=True)
+    pdf.cell(60, 6, f"Notaio (Fisso): {clean_n(params['notaio'])} EUR", ln=True)
     pdf.cell(60, 6, f"Agenzia Acquisto: {params['agenzia_acq'] * 100:.1f}%", ln=False)
     pdf.cell(60, 6, f"Imprevisti Ristr.: {params['imprevisti'] * 100:.1f}%", ln=True)
     pdf.cell(60, 6, f"Costi Tecnici: {params['tecnici'] * 100:.1f}%", ln=False)
@@ -68,54 +73,54 @@ def generate_pdf_report(row, params):
     pdf.cell(60, 6, f"Interessi Passivi: {params['interessi'] * 100:.1f}%", ln=True)
     pdf.ln(5)
     
-    # Sezione 3: Elaborazione Calcoli in Ordine Sequenziale
+    # Sezione 3: Elaborazione Calcoli Espliciti
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "3. ELABORAZIONE DETTAGLIATA DEI CALCOLI", ln=True)
-    pdf.line(15, 123, 110, 123)
+    pdf.cell(0, 8, "3. SCRIPT LOGICO DI ELABORAZIONE E FORMULE ESPLICITE", ln=True)
+    pdf.line(15, 123, 130, 123)
     pdf.ln(4)
     
-    # Tabella dei calcoli ordinati
+    # Tabella dei calcoli con larghezze adeguate alle stringhe delle formule (125mm + 55mm = 180mm totale)
     pdf.set_font("Helvetica", "B", 10)
     pdf.set_fill_color(241, 245, 249)
-    pdf.cell(110, 8, " Voce di Spesa / Ricavo", border=1, fill=True)
-    pdf.cell(70, 8, " Valore", border=1, fill=True, align="R")
+    pdf.cell(125, 8, " Voce e Sviluppo Matematico del Calcolo", border=1, fill=True)
+    pdf.cell(55, 8, " Risultato", border=1, fill=True, align="R")
     pdf.ln()
     
-    pdf.set_font("Helvetica", "", 10)
+    pdf.set_font("Helvetica", "", 9)
     calcoli = [
-        ("Prezzo Immobile Oggetto di Ricerca (Col. J)", safe_euro(row['Prezzo_J'])),
-        ("  + Imposta di Registro Calcolata", safe_euro(row['Imposta'])),
-        ("  + Onorario Notarile", safe_euro(row['Notaio'])),
-        ("  + Commissione Agenzia in Entrata", safe_euro(row['Agenzia_Acq'])),
-        ("COSTO ACQUISTO COMPLESSIVO (Col. N)", safe_euro(row['Costo_Acquisto_Totale'])),
-        ("----------------------------------------------------------------------", "--------------------------"),
-        ("Ipotesi Costo di Ristrutturazione Base (Col. P)", safe_euro(row['Costo_Ristr_P'])),
-        ("  + Costi Tecnici di Progettazione", safe_euro(row['Costi_Tecnici_Val'])),
-        ("  + Fondo di Riserva Imprevisti", safe_euro(row['Imprevisti_Val'])),
-        ("COSTO RISTRUTTURAZIONE TOTALE (Col. T)", safe_euro(row['Costo_Ristr_Totale'])),
-        ("----------------------------------------------------------------------", "--------------------------"),
-        ("IPOTESI DI VENDITA TARGET (Col. U)", safe_euro(row['Ipotesi_Vendita_U'])),
-        ("  - Oneri Agenzia in Uscita", safe_euro(row['Agenzia_Vendita_Val'])),
-        ("  - Interessi Passivi Finanziamento", safe_euro(row['Interessi_Val'])),
-        ("----------------------------------------------------------------------", "--------------------------"),
-        ("UTILE LORDO OPERAZIONE (Col. Y)", safe_euro(row['Utile_Lordo']))
+        ("Prezzo Immobile di Ricerca (Valore Base J)", safe_euro(row['Prezzo_J'])),
+        (f"  + Imposta di Registro ({params['imposta']*100:.1f}% * {clean_n(row['Prezzo_J'])})", safe_euro(row['Imposta'])),
+        (f"  + Onorario Notarile (Valore Fisso)", safe_euro(row['Notaio'])),
+        (f"  + Commissione Agenzia Entrata ({params['agenzia_acq']*100:.1f}% * {clean_n(row['Prezzo_J'])})", safe_euro(row['Agenzia_Acq'])),
+        ("COSTO ACQUISTO COMPLESSIVO (Colonna N)", safe_euro(row['Costo_Acquisto_Totale'])),
+        ("----------------------------------------------------------------------------------------------------", "-----------------------"),
+        (f"Ipotesi Ristrutturazione Base ({row['Superficie']} mq * {clean_n(params['costo_mq'])})", safe_euro(row['Costo_Ristr_P'])),
+        (f"  + Costi Tecnici di Progettazione ({params['tecnici']*100:.1f}% * {clean_n(row['Costo_Ristr_P'])})", safe_euro(row['Costi_Tecnici_Val'])),
+        (f"  + Fondo Riserva Imprevisti ({params['imprevisti']*100:.1f}% * {clean_n(row['Costo_Ristr_P'])})", safe_euro(row['Imprevisti_Val'])),
+        ("COSTO RISTRUTTURAZIONE TOTALE (Colonna T)", safe_euro(row['Costo_Ristr_Totale'])),
+        ("----------------------------------------------------------------------------------------------------", "-----------------------"),
+        (f"IPOTESI DI VENDITA TARGET [ (Costo Acq. + Costo Ristr.) * (1 + {params['plusvalore']*100:.1f}%) ]", safe_euro(row['Ipotesi_Vendita_U'])),
+        (f"  - Incidenza di Vendita al MQ ({clean_n(row['Ipotesi_Vendita_U'])} / {row['Superficie']} mq)", f"{clean_n(row['Incidenza_MQ'])} EUR/mq"),
+        (f"  - Oneri Agenzia Uscita ({params['agenzia_ven']*100:.1f}% * {clean_n(row['Ipotesi_Vendita_U'])})", safe_euro(row['Agenzia_Vendita_Val'])),
+        (f"  - Interessi Passivi Finanziamento ({params['interessi']*100:.1f}% * {clean_n(row['Costo_Acquisto_Totale'])})", safe_euro(row['Interessi_Val'])),
+        ("----------------------------------------------------------------------------------------------------", "-----------------------"),
+        ("UTILE LORDO OPERAZIONE ATTESO (Colonna Y)", safe_euro(row['Utile_Lordo']))
     ]
     
     for voce, valore in calcoli:
         if "TOTAL" in voce.upper() or "UTILE" in voce.upper() or "IPOTESI DI VENDITA" in voce.upper():
-            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_font("Helvetica", "B", 9)
         else:
-            pdf.set_font("Helvetica", "", 10)
-        pdf.cell(110, 7, f" {voce}", border=1)
-        pdf.cell(70, 7, f"{valore} ", border=1, align="R")
+            pdf.set_font("Helvetica", "", 9)
+        pdf.cell(125, 7, f" {voce}", border=1)
+        pdf.cell(55, 7, f"{valore} ", border=1, align="R")
         pdf.ln()
         
-    # Salva il PDF in un buffer di memoria
     pdf_output = io.BytesIO()
     pdf.output(pdf_output)
     pdf_output.seek(0)
     return pdf_output.read()
-    
+
 # -----------------------------------------
 # CONFIGURAZIONE PAGINA STREAMLIT
 # -----------------------------------------
@@ -137,7 +142,7 @@ tipologia = st.sidebar.selectbox("Tipologia", ["Residenziale", "Commerciale", "U
 prezzo_range = st.sidebar.slider("Range Prezzo Ricerca (€)", 0, 1000000, (50000, 300000), step=5000)
 
 st.sidebar.markdown("---")
-st.sidebar.caption("GECO Engine v1.5 - Report System")
+st.sidebar.caption("GECO Engine v1.6")
 
 # -----------------------------------------
 # MAIN: TARGET RENDIMENTO E PARAMETRI
@@ -162,11 +167,11 @@ costi_tecnici_perc = col6.number_input("Costi Tecnici (%)", value=10.0, step=1.0
 agenzia_ven_perc = col7.number_input("Agenzia Vendita (%)", value=3.0, step=0.5) / 100
 interessi_perc = col8.number_input("Interessi Passivi (%)", value=4.0, step=0.5) / 100
 
-# Pacchetto parametri da passare al PDF
 current_params = {
     "plusvalore": plusvalore_atteso_perc, "costo_mq": param_prezzo, "imposta": imposta_perc,
     "notaio": notaio_euro, "agenzia_acq": agenzia_acq_perc, "imprevisti": imprevisti_perc,
-    "tecnici": costi_tecnici_perc, "agenzia_ven": agenzia_ven_perc, "interessi": interessi_perc
+    "tecnici": costs_tecnici_perc if 'costs_tecnici_perc' in locals() else costi_tecnici_perc, 
+    "agenzia_ven": agenzia_ven_perc, "interessi": interessi_perc
 }
 
 st.markdown("---")
@@ -199,7 +204,10 @@ def calculate_metrics(df_calc):
     df_calc['Agenzia_Acq'] = df_calc['Prezzo_J'] * agenzia_acq_perc
     df_calc['Costo_Acquisto_Totale'] = df_calc['Prezzo_J'] + df_calc['Imposta'] + df_calc['Notaio'] + df_calc['Agenzia_Acq']
 
+    # Calcolo Target Vendita ed Incidenza al MQ richiesta
     df_calc['Ipotesi_Vendita_U'] = (df_calc['Costo_Acquisto_Totale'] + df_calc['Costo_Ristr_Totale']) * (1 + plusvalore_atteso_perc)
+    df_calc['Incidenza_MQ'] = df_calc['Ipotesi_Vendita_U'] / df_calc['Superficie']
+    
     df_calc['Agenzia_Vendita_Val'] = df_calc['Ipotesi_Vendita_U'] * agenzia_ven_perc
     df_calc['Interessi_Val'] = df_calc['Costo_Acquisto_Totale'] * interessi_perc
 
@@ -210,7 +218,7 @@ def calculate_metrics(df_calc):
     return df_calc
 
 # -----------------------------------------
-# TABELLA RISULTATI INTERATTIVA CON COLS Loop
+# TABELLA RISULTATI CON COLONNA INCIDENZA AL MQ
 # -----------------------------------------
 st.write("### Risultati Analisi")
 
@@ -222,16 +230,16 @@ df_final_filtered = df_geo_filtered[mask_price].copy()
 if not df_final_filtered.empty:
     df_calculated = calculate_metrics(df_final_filtered)
     
-    # Creazione Intestazione Tabella Custom
-    hdr_cols = st.columns([1.2, 1.5, 0.7, 1.3, 1.3, 1.3, 1.3, 1.3, 0.8, 1.0])
-    headers = ["Comune", "Zona", "Mq", "Acquisto Iniz.", "Costo Acq. Tot", "Costo Ristr.", "Target Vendita", "Utile Lordo", "Annuncio", "Report"]
+    # Rimodulazione larghezze colonne per inserire l'Incidenza al MQ (11 colonne totali)
+    hdr_cols = st.columns([1.0, 1.3, 0.5, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.6, 0.8])
+    headers = ["Comune", "Zona", "Mq", "Acquisto Iniz.", "Costo Acq. Tot", "Costo Ristr.", "Target Vendita", "Incidenza al MQ", "Utile Lordo", "Annuncio", "Report"]
     for col, text in zip(hdr_cols, headers):
         col.markdown(f"**{text}**")
     st.markdown("<hr style='margin: 5px 0 10px 0;'>", unsafe_allow_html=True)
     
-    # Popolamento Righe con pulsante Download integrato alla fine
+    # Ciclo di popolamento righe
     for idx, row in df_calculated.iterrows():
-        row_cols = st.columns([1.2, 1.5, 0.7, 1.3, 1.3, 1.3, 1.3, 1.3, 0.8, 1.0])
+        row_cols = st.columns([1.0, 1.3, 0.5, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.6, 0.8])
         
         row_cols[0].write(row['Comune'])
         row_cols[1].write(row['Zona'])
@@ -240,15 +248,16 @@ if not df_final_filtered.empty:
         row_cols[4].write(format_euro(row['Costo_Acquisto_Totale']))
         row_cols[5].write(format_euro(row['Costo_Ristr_Totale']))
         row_cols[6].write(format_euro(row['Ipotesi_Vendita_U']))
+        row_cols[7].write(f"{format_euro(row['Incidenza_MQ'])}/mq") # Nuova colonna inserita qui
         
-        # Evidenziazione Utile Lordo
-        row_cols[7].markdown(f"<span style='color: #10b981; font-weight: bold;'>{format_euro(row['Utile_Lordo'])}</span>", unsafe_allow_html=True)
-        row_cols[8].markdown(f"[Link]({row['Link']})")
+        # Utile Lordo evidenziato
+        row_cols[8].markdown(f"<span style='color: #10b981; font-weight: bold;'>{format_euro(row['Utile_Lordo'])}</span>", unsafe_allow_html=True)
+        row_cols[9].markdown(f"[Link]({row['Link']})")
         
-        # Generazione Dinamica dei Byte del PDF per la riga corrente
+        # Generazione PDF dinamicamente tracciando le formule esplicite
         pdf_data = generate_pdf_report(row, current_params)
         
-        row_cols[9].download_button(
+        row_cols[10].download_button(
             label="📄 PDF",
             data=pdf_data,
             file_name=f"GECO_Report_{row['Comune']}_{row['Zona'].replace(' ', '_')}_{idx}.pdf",
@@ -278,3 +287,5 @@ if not df_geo_filtered.empty:
         st.markdown(f"**Acquisto (Media Richiesta)**<br><span style='font-size: 1.2rem;'>**{format_euro(prezzo_medio_mq_richiesta)} / mq**</span><br><span style='font-size: 0.9rem; color: #a1a1aa;'>Totale medio: {format_euro(prezzo_medio_richiesta)}</span>", unsafe_allow_html=True)
     with col_bench2:
         st.markdown(f"**Target Vendita (Finito)**<br><span style='font-size: 1.2rem; color: #10b981;'>**{format_euro(prezzo_medio_mq_vendita)} / mq**</span><br><span style='font-size: 0.9rem; color: #a1a1aa;'>Totale medio: {format_euro(prezzo_medio_vendita)}</span>", unsafe_allow_html=True)
+else:
+    st.warning("Dati insufficienti nell'area selezionata per calcolare il benchmark di mercato.")
