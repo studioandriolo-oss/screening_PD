@@ -225,16 +225,17 @@ try:
     # PULIZIA DATI: Evitiamo crash e settiamo "N.C." dove manca la zona
     if 'Indirizzo' not in df.columns:
         df['Indirizzo'] = "N.C."
-    
+        
     df['Zona'] = df['Zona'].fillna("N.C.").replace(["", "Non Specificata", "non specificata"], "N.C.")
     df['Indirizzo'] = df['Indirizzo'].fillna("N.C.")
     
-    # Aggiorna dinamicamente i filtri della sidebar basandosi sui dati realmente presenti nel DB
+    # Aggiorna dinamicamente i filtri della sidebar
     lista_comuni = sorted(df['Comune'].unique().tolist())
     lista_zone = sorted(df['Zona'].unique().tolist())
+    
 except FileNotFoundError:
     # Fallback sicuro se lo scraper non è ancora stato eseguito sul server
-    st.warning("⚠️ Database immobiliare locale non trovato. Esegui 'scraper.py' per popolare i dati. Utilizzo dati di test provvisori.")
+    st.warning("⚠️ Database immobiliare non trovato. Utilizzo dati di test.")
     data_fallback = {
         'Comune': ['Padova', 'Padova', 'Padova'],
         'Zona': ['Centro Storico', 'Guizza', 'Portello'],
@@ -247,10 +248,6 @@ except FileNotFoundError:
     df = pd.DataFrame(data_fallback)
     lista_comuni = ["Padova"]
     lista_zone = ["Centro Storico", "Guizza", "Portello"]
-
-# -----------------------------------------
-# MOTORE DI CALCOLO PANDAS
-# -----------------------------------------
 
 # -----------------------------------------
 # MOTORE DI CALCOLO PANDAS
