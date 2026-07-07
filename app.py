@@ -16,21 +16,21 @@ def generate_pdf_report(row, params):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt=f"Report Immobiliare: {row['Comune']} - {row['Zona']}", ln=True, align='C')
     
-    # 1. Calcola i valori formattati
-    prezzo_formattato = format_euro(row['Prezzo_J'])
-    utile_formattato = format_euro(row['Utile_Lordo'])
+    # 1. Pulisce caratteri strani (spazi web, trattini lunghi) dai nomi di zona e comune
+    titolo = f"Report Immobiliare: {row['Comune']} - {row['Zona']}"
+    titolo_sicuro = titolo.encode('latin-1', 'ignore').decode('latin-1')
     
-    # 2. Sostituisci il simbolo € con la parola "Euro" per evitare il crash del font
-    prezzo_pulito = prezzo_formattato.replace("€", "Euro")
-    utile_pulito = utile_formattato.replace("€", "Euro")
+    # 2. Sostituisci il simbolo € con la parola "Euro"
+    prezzo_pulito = format_euro(row['Prezzo_J']).replace("€", "Euro")
+    utile_pulito = format_euro(row['Utile_Lordo']).replace("€", "Euro")
     
     # 3. Stampa nel PDF
+    pdf.cell(200, 10, txt=titolo_sicuro, ln=True, align='C')
     pdf.cell(200, 10, txt=f"Acquisto: {prezzo_pulito}", ln=True, align='C')
     pdf.cell(200, 10, txt=f"Utile Lordo Stimato: {utile_pulito}", ln=True, align='C')
     
-    return pdf.output(dest="S").encode("latin1")
+    return bytes(pdf.output(dest="S"))
 # -----------------------------------------
 # 1. CONFIGURAZIONE PAGINA
 # -----------------------------------------
@@ -167,7 +167,7 @@ def calculate_metrics(df_calc):
 # -----------------------------------------
 st.write("### Risultati Analisi")
 
-mask_geo = (df['Comune'].isin(comune) if comune else True) & (df['Zona'].isin(zona) if zona else True) & (df['Tipologia'] == tipologia)
+mask_geo = df['Comune'].isin(comune) & df['Zona'].isin(zona) & (df['Tipologia'] == tipologia)
 df_geo_filtered = df[mask_geo].copy()
 mask_price = (df_geo_filtered['Prezzo_J'] >= prezzo_range[0]) & (df_geo_filtered['Prezzo_J'] <= prezzo_range[1])
 df_final_filtered = df_geo_filtered[mask_price].copy()
