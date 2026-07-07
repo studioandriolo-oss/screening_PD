@@ -6,128 +6,34 @@ from fpdf import FPDF
 import io
 
 # -----------------------------------------
-# FUNZIONE FORMATTAZIONE NUMERICA (Formato Italiano)
-# -----------------------------------------
-def format_num_it(val):
-    if pd.isna(val):
-        return "0,00"
-    val_str = f"{val:,.2f}"
-    # Inverte la separazione anglosassone in quella italiana (. per migliaia, , per decimali)
-    return val_str.replace(",", "X").replace(".", ",").replace("X", ".")
-
-def format_euro(val):
-    return f"€ {format_num_it(val)}"
-
-# -----------------------------------------
-# FUNZIONE GENERAZIONE PDF REPORT WITH EXPLICIT EQUATIONS
-# -----------------------------------------
-def generate_pdf_report(row, params):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_margins(15, 20, 15)
-    
-    # Helper interni per pulizia stringhe e valute nel PDF
-    def clean_n(val):
-        return format_num_it(val)
-    def safe_euro(val):
-        return f"{format_num_it(val)} EUR"
-    
-    # Intestazione Professionale
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.set_text_color(16, 185, 129) # Verde GECO
-    pdf.cell(0, 10, "GECO IMMOBILIARE - SCREENING REPORT DETTAGLIATO", ln=True, align="C")
-    pdf.set_draw_color(16, 185, 129)
-    pdf.line(15, 32, 195, 32)
-    pdf.ln(10)
-    
-    # Sezione 1: Dati Immobile
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_text_color(30, 41, 59)
-    pdf.cell(0, 8, "1. DATI SPECIFICI DELL'IMMOBILE", ln=True)
-    pdf.line(15, 43, 80, 43)
-    pdf.ln(2)
-    
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(50, 6, f"Comune: {row['Comune']}", ln=False)
-    pdf.cell(50, 6, f"Zona: {row['Zona']}", ln=True)
-    pdf.cell(50, 6, f"Superficie: {row['Superficie']} mq", ln=False)
-    pdf.cell(50, 6, f"Tipologia: {row['Tipologia']}", ln=True)
-    pdf.cell(0, 6, f"Link Annuncio: {row['Link']}", ln=True)
-    pdf.ln(5)
-    
-    # Sezione 2: Target Strategico e Parametri Inseriti
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "2. TARGET STRATEGICO E PARAMETRI FINANZIARI", ln=True)
-    pdf.line(15, 77, 110, 77)
-    pdf.ln(2)
-    
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(60, 6, f"Plusvalore Atteso: {params['plusvalore'] * 100:.1f}%", ln=False)
-    pdf.cell(60, 6, f"Costo Base Ristr.: {clean_n(params['costo_mq'])} EUR/mq", ln=True)
-    pdf.cell(60, 6, f"Imposta Registro: {params['imposta'] * 100:.1f}%", ln=False)
-    pdf.cell(60, 6, f"Notaio (Fisso): {clean_n(params['notaio'])} EUR", ln=True)
-    pdf.cell(60, 6, f"Agenzia Acquisto: {params['agenzia_acq'] * 100:.1f}%", ln=False)
-    pdf.cell(60, 6, f"Imprevisti Ristr.: {params['imprevisti'] * 100:.1f}%", ln=True)
-    pdf.cell(60, 6, f"Costi Tecnici: {params['tecnici'] * 100:.1f}%", ln=False)
-    pdf.cell(60, 6, f"Agenzia Vendita: {params['agenzia_ven'] * 100:.1f}%", ln=True)
-    pdf.cell(60, 6, f"Interessi Passivi: {params['interessi'] * 100:.1f}%", ln=True)
-    pdf.ln(5)
-    
-    # Sezione 3: Elaborazione Calcoli Espliciti
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "3. SCRIPT LOGICO DI ELABORAZIONE E FORMULE ESPLICITE", ln=True)
-    pdf.line(15, 123, 130, 123)
-    pdf.ln(4)
-    
-    # Tabella dei calcoli con larghezze adeguate alle stringhe delle formule (125mm + 55mm = 180mm totale)
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.set_fill_color(241, 245, 249)
-    pdf.cell(125, 8, " Voce e Sviluppo Matematico del Calcolo", border=1, fill=True)
-    pdf.cell(55, 8, " Risultato", border=1, fill=True, align="R")
-    pdf.ln()
-    
-    pdf.set_font("Helvetica", "", 9)
-    calcoli = [
-        ("Prezzo Immobile di Ricerca (Valore Base J)", safe_euro(row['Prezzo_J'])),
-        (f"  + Imposta di Registro ({params['imposta']*100:.1f}% * {clean_n(row['Prezzo_J'])})", safe_euro(row['Imposta'])),
-        (f"  + Onorario Notarile (Valore Fisso)", safe_euro(row['Notaio'])),
-        (f"  + Commissione Agenzia Entrata ({params['agenzia_acq']*100:.1f}% * {clean_n(row['Prezzo_J'])})", safe_euro(row['Agenzia_Acq'])),
-        ("COSTO ACQUISTO COMPLESSIVO (Colonna N)", safe_euro(row['Costo_Acquisto_Totale'])),
-        ("----------------------------------------------------------------------------------------------------", "-----------------------"),
-        (f"Ipotesi Ristrutturazione Base ({row['Superficie']} mq * {clean_n(params['costo_mq'])})", safe_euro(row['Costo_Ristr_P'])),
-        (f"  + Costi Tecnici di Progettazione ({params['tecnici']*100:.1f}% * {clean_n(row['Costo_Ristr_P'])})", safe_euro(row['Costi_Tecnici_Val'])),
-        (f"  + Fondo Riserva Imprevisti ({params['imprevisti']*100:.1f}% * {clean_n(row['Costo_Ristr_P'])})", safe_euro(row['Imprevisti_Val'])),
-        ("COSTO RISTRUTTURAZIONE TOTALE (Colonna T)", safe_euro(row['Costo_Ristr_Totale'])),
-        ("----------------------------------------------------------------------------------------------------", "-----------------------"),
-        (f"IPOTESI DI VENDITA TARGET [ (Costo Acq. + Costo Ristr.) * (1 + {params['plusvalore']*100:.1f}%) ]", safe_euro(row['Ipotesi_Vendita_U'])),
-        (f"  - Incidenza di Vendita al MQ ({clean_n(row['Ipotesi_Vendita_U'])} / {row['Superficie']} mq)", f"{clean_n(row['Incidenza_MQ'])} EUR/mq"),
-        (f"  - Oneri Agenzia Uscita ({params['agenzia_ven']*100:.1f}% * {clean_n(row['Ipotesi_Vendita_U'])})", safe_euro(row['Agenzia_Vendita_Val'])),
-        (f"  - Interessi Passivi Finanziamento ({params['interessi']*100:.1f}% * {clean_n(row['Costo_Acquisto_Totale'])})", safe_euro(row['Interessi_Val'])),
-        ("----------------------------------------------------------------------------------------------------", "-----------------------"),
-        ("UTILE LORDO OPERAZIONE ATTESO (Colonna Y)", safe_euro(row['Utile_Lordo']))
-    ]
-    
-    for voce, valore in calcoli:
-        if "TOTAL" in voce.upper() or "UTILE" in voce.upper() or "IPOTESI DI VENDITA" in voce.upper():
-            pdf.set_font("Helvetica", "B", 9)
-        else:
-            pdf.set_font("Helvetica", "", 9)
-        pdf.cell(125, 7, f" {voce}", border=1)
-        pdf.cell(55, 7, f"{valore} ", border=1, align="R")
-        pdf.ln()
-        
-    pdf_output = io.BytesIO()
-    pdf.output(pdf_output)
-    pdf_output.seek(0)
-    return pdf_output.read()
-
-# -----------------------------------------
-# CONFIGURAZIONE PAGINA STREAMLIT
+# 1. CONFIGURAZIONE PAGINA
 # -----------------------------------------
 st.set_page_config(page_title="GECO Immobiliare - Screening Engine", layout="wide")
 
 # -----------------------------------------
-# SIDEBAR: FILTRI E RICERCA
+# 2. CARICAMENTO DATABASE (Prima della Sidebar!)
+# -----------------------------------------
+try:
+    df = pd.read_csv("annunci_padova.csv", encoding="utf-8")
+    lista_comuni = sorted(df['Comune'].dropna().unique().tolist())
+    lista_zone = sorted(df['Zona'].dropna().unique().tolist())
+except FileNotFoundError:
+    st.warning("⚠️ Database non trovato. Verranno usati dati di test. Avvia lo scraper su GitHub Actions.")
+    # Fallback dati
+    data = {
+        'Comune': ['Padova', 'Padova', 'Vigodarzere', 'Padova', 'Padova'],
+        'Zona': ['Centro Storico', 'Centro Storico', 'Sacra Famiglia', 'Portello', 'Centro Storico'],
+        'Tipologia': ['Residenziale', 'Residenziale', 'Residenziale', 'Residenziale', 'Residenziale'],
+        'Superficie': [100, 150, 120, 70, 90],
+        'Prezzo_J': [150000, 450000, 180000, 95000, 220000],
+        'Link': ['https://www.immobiliare.it/1', 'https://www.immobiliare.it/2', 'https://www.immobiliare.it/3', 'https://www.immobiliare.it/4', 'https://www.immobiliare.it/5']
+    }
+    df = pd.DataFrame(data)
+    lista_comuni = sorted(df['Comune'].unique().tolist())
+    lista_zone = sorted(df['Zona'].unique().tolist())
+
+# -----------------------------------------
+# 3. SIDEBAR: FILTRI E RICERCA
 # -----------------------------------------
 try:
     logo = Image.open("geco_logo.png")
@@ -136,13 +42,14 @@ except FileNotFoundError:
     st.sidebar.title("GECO IMMOBILIARE")
 
 st.sidebar.markdown("### Filtri di Ricerca")
-comune = st.sidebar.multiselect("Comune", ["Padova", "Ponte di Brenta", "Vigodarzere", "Albignasego"], default=["Padova"])
-zona = st.sidebar.multiselect("Zona", ["Centro Storico", "Guizza", "Sacra Famiglia", "Portello"], default=["Centro Storico"])
+# CORREZIONE QUI: Aggiunte le etichette "Comune" e "Zona", e impostati i default
+comune = st.sidebar.multiselect("Comune", options=lista_comuni, default=lista_comuni)
+zona = st.sidebar.multiselect("Zona", options=lista_zone, default=lista_zone)
 tipologia = st.sidebar.selectbox("Tipologia", ["Residenziale", "Commerciale", "Ufficio"])
 prezzo_range = st.sidebar.slider("Range Prezzo Ricerca (€)", 0, 1000000, (50000, 300000), step=5000)
 
 st.sidebar.markdown("---")
-st.sidebar.caption("GECO Engine v1.6")
+st.sidebar.caption("GECO Engine v1.7")
 
 # -----------------------------------------
 # MAIN: TARGET RENDIMENTO E PARAMETRI
@@ -177,17 +84,29 @@ current_params = {
 st.markdown("---")
 
 # -----------------------------------------
-# DATABASE FITTIZIO
+# DATABASE DI SCOUTING REALE (Lettura CSV)
 # -----------------------------------------
-data = {
-    'Comune': ['Padova', 'Padova', 'Vigodarzere', 'Padova', 'Padova'],
-    'Zona': ['Centro Storico', 'Centro Storico', 'Sacra Famiglia', 'Portello', 'Centro Storico'],
-    'Tipologia': ['Residenziale', 'Residenziale', 'Residenziale', 'Residenziale', 'Residenziale'],
-    'Superficie': [100, 150, 120, 70, 90],
-    'Prezzo_J': [150000, 450000, 180000, 95000, 220000],
-    'Link': ['https://www.immobiliare.it/1', 'https://www.immobiliare.it/2', 'https://www.immobiliare.it/3', 'https://www.immobiliare.it/4', 'https://www.immobiliare.it/5']
-}
-df = pd.DataFrame(data)
+try:
+    # Carica i dati estratti dal motore di scraping
+    df = pd.read_csv("annunci_padova.csv", encoding="utf-8")
+    
+    # Aggiorna dinamicamente i filtri della sidebar basandosi sui dati realmente presenti nel DB
+    lista_comuni = sorted(df['Comune'].unique().tolist())
+    lista_zone = sorted(df['Zona'].unique().tolist())
+except FileNotFoundError:
+    # Fallback sicuro se lo scraper non è ancora stato eseguito sul server
+    st.warning("⚠️ Database immobiliare locale non trovato. Esegui 'scraper.py' per popolare i dati. Utilizzo dati di test provvisori.")
+    data_fallback = {
+        'Comune': ['Padova', 'Padova', 'Padova'],
+        'Zona': ['Centro Storico', 'Guizza', 'Portello'],
+        'Tipologia': ['Residenziale', 'Residenziale', 'Residenziale'],
+        'Superficie': [100, 85, 70],
+        'Prezzo_J': [150000, 120000, 95000],
+        'Link': ['https://www.immobiliare.it', 'https://www.immobiliare.it', 'https://www.immobiliare.it']
+    }
+    df = pd.DataFrame(data_fallback)
+    lista_comuni = ["Padova"]
+    lista_zone = ["Centro Storico", "Guizza", "Portello"]
 
 # -----------------------------------------
 # MOTORE DI CALCOLO PANDAS
