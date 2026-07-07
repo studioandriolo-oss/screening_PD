@@ -35,13 +35,20 @@ def pulisci_superficie(testo_sup):
 # reale dei vari siti. Questa è l'architettura pronta per ospitarli.
 AGENZIE = [
     {
-        "nome": "Engel & Volkers Padova",
+        "nome": "Engel & Völkers Padova",
         "url": "https://www.engelvoelkers.com/it-it/padova/comprare/",
         "selettori": {
-            "card": "div.property-card", # Il contenitore del singolo annuncio
-            "link": "a.property-card-link", # Dove si trova il link (href)
-            "prezzo": "div.price",          # Dove si trova il testo del prezzo
-            "mq": "div.living-space"        # Dove si trova il testo dei mq
+            # Prendiamo il tag <article> puro, dato che racchiude tutto l'annuncio
+            "card": "article", 
+            
+            # Il link è nel tag <a> che contiene la stringa '/exposes/'
+            "link": "a[href*='/exposes/']", 
+            
+            # Non vedendo l'HTML espanso per il prezzo nello screen, usiamo i selettori testuali di Playwright
+            "prezzo": "div:has-text('€')", 
+            
+            # Stessa cosa per i metri quadri: cerchiamo l'elemento lista che contiene 'm²'
+            "mq": "li:has-text('m²')"       
         }
     },
     {
