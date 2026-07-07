@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Scarica il codice del repository
-        uses: actions/checkout@main # Aggiornato per bypassare Node 20
+        uses: actions/checkout@main
 
       - name: Installa Python
-        uses: actions/setup-python@main # Aggiornato per bypassare Node 20
+        uses: actions/setup-python@main
         with:
           python-version: '3.11'
 
@@ -30,10 +30,13 @@ jobs:
         run: |
           git config --global user.name "GECO Scraper Bot"
           git config --global user.email "bot@geco.local"
-          if [ -f annunci_padova.csv ]; then
+          
+          # Controlla se il file esiste prima di fare il commit
+          if test -f "annunci_padova.csv"; then
+            echo "File trovato. Procedo al salvataggio..."
             git add annunci_padova.csv
-            git commit -m "Aggiornamento Database Immobili Padova" || echo "Nessun nuovo dato da salvare"
+            git commit -m "Aggiornamento Database Immobili Padova" || echo "Nessun dato variato"
             git push
           else
-            echo "Nessun file CSV generato. Lo scraper è stato probabilmente bloccato."
+            echo "ATTENZIONE: Il file annunci_padova.csv non è stato creato. Possibile blocco anti-bot o nessun annuncio trovato."
           fi
