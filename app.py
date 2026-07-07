@@ -138,9 +138,17 @@ st.set_page_config(page_title="GECO Immobiliare - Screening Engine", layout="wid
 # 2. CARICAMENTO DATABASE (Prima della Sidebar!)
 # -----------------------------------------
 try:
-    df = pd.read_csv("annunci_padova.csv", encoding="utf-8")
-    lista_comuni = sorted(df['Comune'].dropna().unique().tolist())
-    lista_zone = sorted(df['Zona'].dropna().unique().tolist())
+   df = pd.read_csv("annunci_padova.csv", encoding="utf-8")
+    
+    # PULIZIA DATI: Evitiamo crash e settiamo "N.C." dove manca la zona
+    if 'Indirizzo' not in df.columns:
+        df['Indirizzo'] = "N.C."
+    
+    df['Zona'] = df['Zona'].fillna("N.C.").replace(["", "Non Specificata", "non specificata"], "N.C.")
+    df['Indirizzo'] = df['Indirizzo'].fillna("N.C.")
+    
+    lista_comuni = sorted(df['Comune'].unique().tolist())
+    lista_zone = sorted(df['Zona'].unique().tolist())
 except FileNotFoundError:
     st.warning("⚠️ Database non trovato. Verranno usati dati di test. Avvia lo scraper su GitHub Actions.")
     # Fallback dati
@@ -273,38 +281,38 @@ df_final_filtered = df_geo_filtered[mask_price].copy()
 if not df_final_filtered.empty:
     df_calculated = calculate_metrics(df_final_filtered)
     
-    # Rimodulazione larghezze colonne per inserire l'Incidenza al MQ (11 colonne totali)
-    hdr_cols = st.columns([1.0, 1.3, 0.5, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.6, 0.8])
-    headers = ["Comune", "Zona", "Mq", "Acquisto Iniz.", "Costo Acq. Tot", "Costo Ristr.", "Target Vendita", "Incidenza al MQ", "Utile Lordo", "Annuncio", "Report"]
+    # 11 Colonne: Abbiamo sostituito "Annuncio" con "Via / Link" (più largo)
+    hdr_cols = st.columns([1.0, 1.0, 1.6, 0.5, 1.1, 1.1, 1.1, 1.1, 1.0, 1.0, 0.8])
+    headers = ["Comune", "Zona", "Via / Link", "Mq", "Acquisto Iniz.", "Costo Acq.", "Costo Ristr.", "Target Vendita", "Incidenza", "Utile Lordo", "Report"]
     for col, text in zip(hdr_cols, headers):
         col.markdown(f"**{text}**")
     st.markdown("<hr style='margin: 5px 0 10px 0;'>", unsafe_allow_html=True)
     
-    # Ciclo di popolamento righe
     for idx, row in df_calculated.iterrows():
-        row_cols = st.columns([1.0, 1.3, 0.5, 1.1, 1.1, 1.1, 1.1, 1.1, 1.1, 0.6, 0.8])
+        row_cols = st.columns([1.0, 1.0, 1.6, 0.5, 1.1, 1.1, 1.1, 1.1, 1.0, 1.0, 0.8])
         
         row_cols[0].write(row['Comune'])
         row_cols[1].write(row['Zona'])
-        row_cols[2].write(f"{row['Superficie']}")
-        row_cols[3].write(format_euro(row['Prezzo_J']))
-        row_cols[4].write(format_euro(row['Costo_Acquisto_Totale']))
-        row_cols[5].write(format_euro(row['Costo_Ristr_Totale']))
-        row_cols[6].write(format_euro(row['Ipotesi_Vendita_U']))
-        row_cols[7].write(f"{format_euro(row['Incidenza_MQ'])}/mq")
         
-        # Utile Lordo evidenziato
-        row_cols[8].markdown(f"<span style='color: #10b981; font-weight: bold;'>{format_euro(row['Utile_Lordo'])}</span>", unsafe_allow_html=True)
-        row_cols[9].markdown(f"[Link]({row['Link']})")
+        # Uniamo l'Indirizzo testuale e il link cliccabile nella stessa cella
+        indirizzo_breve = str(row['Indirizzo'])[:40] + "..." if len(str(row['Indirizzo'])) > 40 else str(row['Indirizzo'])
+        row_cols[2].markdown(f"[{indirizzo_breve}]({row['Link']})")
         
-        # Generazione PDF dinamica con blocco di sicurezza 
+        row_cols[3].write(f"{row['Superficie']}")
+        row_cols[4].write(format_euro(row['Prezzo_J']))
+        row_cols[5].write(format_euro(row['Costo_Acquisto_Totale']))
+        row_cols[6].write(format_euro(row['Costo_Ristr_Totale']))
+        row_cols[7].write(format_euro(row['Ipotesi_Vendita_U']))
+        row_cols[8].write(f"{format_euro(row['Incidenza_MQ'])}/mq")
+        
+        row_cols[9].markdown(f"<span style='color: #10b981; font-weight: bold;'>{format_euro(row['Utile_Lordo'])}</span>", unsafe_allow_html=True)
+        
         try:
             pdf_data = generate_pdf_report(row, current_params)
-            
             row_cols[10].download_button(
                 label="📄 PDF",
                 data=pdf_data,
-                file_name=f"Report_{row['Zona']}_{idx}.pdf",
+                file_name=f"Report_{row['Comune']}_{idx}.pdf",
                 mime="application/pdf",
                 key=f"btn_dl_{idx}"
             )
