@@ -30,6 +30,10 @@ jobs:
         run: |
           git config --global user.name "GECO Scraper Bot"
           git config --global user.email "bot@geco.local"
-          git add annunci_padova.csv
-          git commit -m "Aggiornamento Database Immobili Padova" || echo "Nessun nuovo dato da salvare"
-          git push
+          if [ -f annunci_padova.csv ]; then
+            git add annunci_padova.csv
+            git commit -m "Aggiornamento Database Immobili Padova" || echo "Nessun nuovo dato da salvare"
+            git push
+          else
+            echo "Nessun file CSV generato. Lo scraper è stato probabilmente bloccato."
+          fi
