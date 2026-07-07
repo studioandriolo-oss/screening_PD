@@ -203,11 +203,14 @@ if not df_final_filtered.empty:
         pdf_data = generate_pdf_report(row, current_params)
         
         row_cols[10].download_button(
-            label="📄 PDF",
-            data=pdf_data,
-            file_name=f"GECO_Report_{row['Comune']}_{row['Zona'].replace(' ', '_')}_{idx}.pdf",
-            mime="application/pdf",
-            key=f"btn_dl_{idx}"
+                label="📄 PDF",
+                data=pdf_data,
+                file_name=f"Report_{row['Zona']}_{idx}.pdf",
+                mime="application/pdf",
+                key=f"btn_dl_{idx}"
+            )
+    except Exception:
+        row_cols[10].write("Err. PDF")
         )
 else:
     st.info("Nessun immobile trovato nel range di prezzo indicato per i filtri selezionati.")
