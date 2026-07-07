@@ -12,15 +12,24 @@ def format_euro(val):
     return f"€ {val:,.0f}".replace(",", ".")
 
 def generate_pdf_report(row, params):
-    # Un PDF segnaposto base per far funzionare il bottone di download
+    # Inizializza il PDF
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, txt=f"Report Immobiliare: {row['Comune']} - {row['Zona']}", ln=True, align='C')
-    acquisto_txt = format_euro(row['Prezzo_J']).replace("€", "Euro")
-    utile_txt = format_euro(row['Utile_Lordo']).replace("€", "Euro")
-    pdf.cell(200, 10, txt=f"Acquisto: {format_euro(row['Prezzo_J'])}", ln=True, align='C')
-    pdf.cell(200, 10, txt=f"Utile Lordo Stimato: {format_euro(row['Utile_Lordo'])}", ln=True, align='C')
+    
+    # 1. Calcola i valori formattati
+    prezzo_formattato = format_euro(row['Prezzo_J'])
+    utile_formattato = format_euro(row['Utile_Lordo'])
+    
+    # 2. Sostituisci il simbolo € con la parola "Euro" per evitare il crash del font
+    prezzo_pulito = prezzo_formattato.replace("€", "Euro")
+    utile_pulito = utile_formattato.replace("€", "Euro")
+    
+    # 3. Stampa nel PDF
+    pdf.cell(200, 10, txt=f"Acquisto: {prezzo_pulito}", ln=True, align='C')
+    pdf.cell(200, 10, txt=f"Utile Lordo Stimato: {utile_pulito}", ln=True, align='C')
+    
     return pdf.output(dest="S").encode("latin1")
 # -----------------------------------------
 # 1. CONFIGURAZIONE PAGINA
