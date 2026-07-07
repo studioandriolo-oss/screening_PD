@@ -5,6 +5,21 @@ from PIL import Image
 from fpdf import FPDF
 import io
 
+def format_euro(val):
+    if pd.isna(val) or val == np.inf or val == -np.inf:
+        return "N/A"
+    # Formatta il numero con i separatori delle migliaia
+    return f"€ {val:,.0f}".replace(",", ".")
+
+def generate_pdf_report(row, params):
+    # Un PDF segnaposto base per far funzionare il bottone di download
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt=f"Report Immobiliare: {row['Comune']} - {row['Zona']}", ln=True, align='C')
+    pdf.cell(200, 10, txt=f"Acquisto: {format_euro(row['Prezzo_J'])}", ln=True, align='C')
+    pdf.cell(200, 10, txt=f"Utile Lordo Stimato: {format_euro(row['Utile_Lordo'])}", ln=True, align='C')
+    return pdf.output(dest="S").encode("latin1")
 # -----------------------------------------
 # 1. CONFIGURAZIONE PAGINA
 # -----------------------------------------
