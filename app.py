@@ -23,93 +23,99 @@ def generate_pdf_report(row, params):
     def fmt_perc(val):
         return f"{val*100:.1f}%"
 
+    # Funzione per disegnare le righe della tabella
+    def add_row(label, formula, result, is_total=False):
+        pdf.set_font("Arial", 'B' if is_total else '', 11 if is_total else 10)
+        # Sfondo grigio per i totali
+        if is_total:
+            pdf.set_fill_color(240, 240, 240)
+            fill = True
+        else:
+            fill = False
+            
+        testo_sx = f"{label} = {formula}" if formula else label
+        pdf.cell(140, 8, txt=testo_sx, border=1, fill=fill)
+        pdf.cell(50, 8, txt=result, border=1, ln=True, align='R', fill=fill)
+
     # --- TITOLO ---
     pdf.set_font("Arial", 'B', 16)
     titolo = f"Report GECO Immobiliare: {row['Comune']} - {row['Zona']}"
-    # Pulisci eventuali caratteri web invisibili
     titolo_sicuro = titolo.encode('latin-1', 'ignore').decode('latin-1')
-    pdf.cell(200, 10, txt=titolo_sicuro, ln=True, align='L')
+    pdf.cell(190, 10, txt=titolo_sicuro, ln=True, align='L')
     pdf.ln(2)
     
     # --- 1. DATI IMMOBILE ---
     pdf.set_font("Arial", 'B', 12)
-    pdf.cell(200, 8, txt="1. DATI IMMOBILE", ln=True)
-    pdf.set_font("Arial", '', 11)
-    pdf.cell(200, 6, txt=f"Superficie: {row['Superficie']} mq", ln=True)
-    pdf.cell(200, 6, txt=f"Prezzo Richiesto: {fmt(row['Prezzo_J'])}", ln=True)
+    pdf.cell(190, 8, txt="1. DATI IMMOBILE", ln=True)
+    pdf.set_font("Arial", '', 10)
+    pdf.cell(190, 6, txt=f"Superficie: {row['Superficie']} mq", ln=True)
+    pdf.cell(190, 6, txt=f"Prezzo Richiesto: {fmt(row['Prezzo_J'])}", ln=True)
     
-    # Gestione sicura del link
     link_txt = row['Link'] if isinstance(row['Link'], str) else "N/A"
-    pdf.cell(200, 6, txt=f"Link: {link_txt[:70]}...", ln=True, link=link_txt)
-    pdf.ln(5)
+    pdf.cell(190, 6, txt=f"Link: {link_txt[:70]}...", ln=True, link=link_txt)
+    pdf.ln(4)
     
-    # --- 2. PARAMETRI APPLICATI (Dal cruscotto Streamlit) ---
+    # --- 2. PARAMETRI APPLICATI ---
     pdf.set_font("Arial", 'B', 12)
-    pdf.cell(200, 8, txt="2. STRATEGIA E PARAMETRI FINANZIARI", ln=True)
+    pdf.cell(190, 8, txt="2. STRATEGIA E PARAMETRI FINANZIARI", ln=True)
     pdf.set_font("Arial", '', 10)
     
-    # Usiamo una griglia finta a colonne
-    pdf.cell(90, 6, txt=f"Target Plusvalore: {fmt_perc(params['plusvalore'])}")
-    pdf.cell(90, 6, txt=f"Costo Ristrutturazione Base: {fmt(params['costo_mq'])} / mq", ln=True)
-    pdf.cell(90, 6, txt=f"Imposta Registro: {fmt_perc(params['imposta'])}")
-    pdf.cell(90, 6, txt=f"Spese Notarili: {fmt(params['notaio'])}", ln=True)
-    pdf.cell(90, 6, txt=f"Agenzia Acquisto: {fmt_perc(params['agenzia_acq'])}")
-    pdf.cell(90, 6, txt=f"Agenzia Vendita: {fmt_perc(params['agenzia_ven'])}", ln=True)
-    pdf.cell(90, 6, txt=f"Imprevisti Ristrutturazione: {fmt_perc(params['imprevisti'])}")
-    pdf.cell(90, 6, txt=f"Costi Tecnici: {fmt_perc(params['tecnici'])}", ln=True)
-    pdf.cell(90, 6, txt=f"Interessi Passivi: {fmt_perc(params['interessi'])}", ln=True)
-    pdf.ln(5)
+    pdf.cell(95, 6, txt=f"Target Plusvalore: {fmt_perc(params['plusvalore'])}")
+    pdf.cell(95, 6, txt=f"Costo Ristrutturazione Base: {fmt(params['costo_mq'])} / mq", ln=True)
+    pdf.cell(95, 6, txt=f"Imposta Registro: {fmt_perc(params['imposta'])}")
+    pdf.cell(95, 6, txt=f"Spese Notarili: {fmt(params['notaio'])}", ln=True)
+    pdf.cell(95, 6, txt=f"Agenzia Acquisto: {fmt_perc(params['agenzia_acq'])}")
+    pdf.cell(95, 6, txt=f"Agenzia Vendita: {fmt_perc(params['agenzia_ven'])}", ln=True)
+    pdf.cell(95, 6, txt=f"Imprevisti Ristrutturazione: {fmt_perc(params['imprevisti'])}")
+    pdf.cell(95, 6, txt=f"Costi Tecnici: {fmt_perc(params['tecnici'])}", ln=True)
+    pdf.cell(95, 6, txt=f"Interessi Passivi: {fmt_perc(params['interessi'])}", ln=True)
+    pdf.ln(6)
     
-    # --- 3. ESPLOSIONE DEI COSTI MATEMATICI ---
+    # --- 3. BREAKDOWN E TABELLA COSTI ---
     pdf.set_font("Arial", 'B', 12)
-    pdf.cell(200, 8, txt="3. BREAKDOWN DEI COSTI", ln=True)
+    pdf.cell(190, 8, txt="3. BREAKDOWN FINANZIARIO", ln=True)
     
-    # Calcolo voci Acquisizione
+    # --- SEZIONE: COSTI ACQUISTO ---
     imposta_val = row['Prezzo_J'] * params['imposta']
     agenzia_acq_val = row['Prezzo_J'] * params['agenzia_acq']
     
-    pdf.set_font("Arial", '', 11)
-    pdf.cell(200, 6, txt=f"[+] Costi Acquisizione = Prezzo ({fmt(row['Prezzo_J'])}) + Imposta ({fmt(imposta_val)})", ln=True)
-    pdf.cell(200, 6, txt=f"                         + Notaio ({fmt(params['notaio'])}) + Agenzia ({fmt(agenzia_acq_val)})", ln=True)
-    pdf.set_font("Arial", 'B', 11)
-    pdf.cell(200, 6, txt=f"    = COSTO ACQUISTO TOTALE: {fmt(row['Costo_Acquisto_Totale'])}", ln=True)
-    pdf.ln(2)
+    add_row("Prezzo Immobile", "", fmt(row['Prezzo_J']))
+    add_row("Imposta di Registro", f"{fmt(row['Prezzo_J'])} * {fmt_perc(params['imposta'])}", fmt(imposta_val))
+    add_row("Spese Notarili", "Quota fissa", fmt(params['notaio']))
+    add_row("Agenzia Acquisto", f"{fmt(row['Prezzo_J'])} * {fmt_perc(params['agenzia_acq'])}", fmt(agenzia_acq_val))
+    add_row("COSTO ACQUISTO TOTALE", "", fmt(row['Costo_Acquisto_Totale']), is_total=True)
     
-    # Calcolo voci Ristrutturazione
+    # Spazio vuoto tra le tabelle
+    pdf.cell(190, 4, txt="", ln=True)
+    
+    # --- SEZIONE: COSTI RISTRUTTURAZIONE ---
     costo_ristr_base = row['Superficie'] * params['costo_mq']
     tecnici_val = costo_ristr_base * params['tecnici']
     imprevisti_val = costo_ristr_base * params['imprevisti']
     
-    pdf.set_font("Arial", '', 11)
-    pdf.cell(200, 6, txt=f"[+] Costi Ristrutturazione = Lavori ({fmt(costo_ristr_base)}) + Tecnici ({fmt(tecnici_val)})", ln=True)
-    pdf.cell(200, 6, txt=f"                             + Imprevisti ({fmt(imprevisti_val)})", ln=True)
-    pdf.set_font("Arial", 'B', 11)
-    pdf.cell(200, 6, txt=f"    = COSTO RISTRUTTURAZIONE TOTALE: {fmt(row['Costo_Ristr_Totale'])}", ln=True)
-    pdf.ln(5)
+    add_row("Lavori Base (mq)", f"{row['Superficie']} mq * {fmt(params['costo_mq'])}", fmt(costo_ristr_base))
+    add_row("Costi Tecnici", f"{fmt(costo_ristr_base)} * {fmt_perc(params['tecnici'])}", fmt(tecnici_val))
+    add_row("Imprevisti", f"{fmt(costo_ristr_base)} * {fmt_perc(params['imprevisti'])}", fmt(imprevisti_val))
+    add_row("COSTO RISTRUTTURAZIONE TOTALE", "", fmt(row['Costo_Ristr_Totale']), is_total=True)
     
-    # --- 4. CALCOLO VENDITA E UTILE ---
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(200, 8, txt="4. RITORNO ECONOMICO E UTILE", ln=True)
+    # Spazio vuoto tra le tabelle
+    pdf.cell(190, 4, txt="", ln=True)
     
-    pdf.set_font("Arial", '', 11)
-    pdf.cell(200, 6, txt=f"Ipotesi di Vendita calcolata per ottenere il Plusvalore ({fmt_perc(params['plusvalore'])})", ln=True)
-    pdf.set_font("Arial", 'B', 11)
-    pdf.cell(200, 6, txt=f"TARGET VENDITA LORDO: {fmt(row['Ipotesi_Vendita_U'])} (Incidenza: {fmt(row['Incidenza_MQ'])} / mq)", ln=True)
-    pdf.ln(2)
-    
-    # Spese di uscita
+    # --- SEZIONE: VENDITA E UTILE ---
     agenzia_ven_val = row['Ipotesi_Vendita_U'] * params['agenzia_ven']
     interessi_val = row['Costo_Acquisto_Totale'] * params['interessi']
     
-    pdf.set_font("Arial", '', 11)
-    pdf.cell(200, 6, txt=f"[-] Oneri Vendita e Finanziari = Agenzia Vendita ({fmt(agenzia_ven_val)})", ln=True)
-    pdf.cell(200, 6, txt=f"                                 + Interessi ({fmt(interessi_val)})", ln=True)
+    # Il target si basa sulla somma di Acq + Ristr rivalutata del Plusvalore
+    somma_costi = row['Costo_Acquisto_Totale'] + row['Costo_Ristr_Totale']
     
-    pdf.ln(4)
-    pdf.set_font("Arial", 'B', 14)
-    pdf.cell(200, 10, txt=f"UTILE LORDO FINALE: {fmt(row['Utile_Lordo'])}", ln=True)
+    add_row("TARGET VENDITA", f"Costi ({fmt(somma_costi)}) + {fmt_perc(params['plusvalore'])}", fmt(row['Ipotesi_Vendita_U']))
+    add_row("Agenzia Vendita (-)", f"{fmt(row['Ipotesi_Vendita_U'])} * {fmt_perc(params['agenzia_ven'])}", fmt(agenzia_ven_val))
+    add_row("Interessi Passivi (-)", f"Acquisto ({fmt(row['Costo_Acquisto_Totale'])}) * {fmt_perc(params['interessi'])}", fmt(interessi_val))
     
-    # Ritorno sicuro in bytes
+    # Spazio per staccare l'utile finale
+    pdf.cell(190, 2, txt="", ln=True)
+    add_row("UTILE LORDO FINALE", "Vendita - Acq. - Ristr. - Oneri", fmt(row['Utile_Lordo']), is_total=True)
+    
     return bytes(pdf.output(dest="S"))
     
 # -----------------------------------------
