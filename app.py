@@ -193,25 +193,26 @@ if not df_final_filtered.empty:
         row_cols[4].write(format_euro(row['Costo_Acquisto_Totale']))
         row_cols[5].write(format_euro(row['Costo_Ristr_Totale']))
         row_cols[6].write(format_euro(row['Ipotesi_Vendita_U']))
-        row_cols[7].write(f"{format_euro(row['Incidenza_MQ'])}/mq") # Nuova colonna inserita qui
+        row_cols[7].write(f"{format_euro(row['Incidenza_MQ'])}/mq")
         
         # Utile Lordo evidenziato
         row_cols[8].markdown(f"<span style='color: #10b981; font-weight: bold;'>{format_euro(row['Utile_Lordo'])}</span>", unsafe_allow_html=True)
         row_cols[9].markdown(f"[Link]({row['Link']})")
         
-        # Generazione PDF dinamicamente tracciando le formule esplicite
-        pdf_data = generate_pdf_report(row, current_params)
-        
-        row_cols[10].download_button(
+        # Generazione PDF dinamica con blocco di sicurezza 
+        try:
+            pdf_data = generate_pdf_report(row, current_params)
+            
+            row_cols[10].download_button(
                 label="📄 PDF",
                 data=pdf_data,
                 file_name=f"Report_{row['Zona']}_{idx}.pdf",
                 mime="application/pdf",
                 key=f"btn_dl_{idx}"
             )
-    except Exception:
-        row_cols[10].write("Err. PDF")
-        )
+        except Exception:
+            row_cols[10].write("Err. PDF")
+
 else:
     st.info("Nessun immobile trovato nel range di prezzo indicato per i filtri selezionati.")
 
