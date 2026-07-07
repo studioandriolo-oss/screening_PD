@@ -1,19 +1,19 @@
 name: Motore di Scouting (Playwright)
 
 on:
-  workflow_dispatch: # Questo ti permette di avviare lo scraper manualmente con un clic!
+  workflow_dispatch: 
   schedule:
-    - cron: '0 3 * * 1,4' # Avvio automatico ogni Lunedì e Giovedì alle 3:00 di notte
+    - cron: '0 3 * * 1,4' 
 
 jobs:
   scout-immobili:
     runs-on: ubuntu-latest
     steps:
       - name: Scarica il codice del repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@main # Aggiornato per bypassare Node 20
 
       - name: Installa Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@main # Aggiornato per bypassare Node 20
         with:
           python-version: '3.11'
 
