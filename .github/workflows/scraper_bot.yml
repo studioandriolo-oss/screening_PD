@@ -5,6 +5,10 @@ on:
   schedule:
     - cron: '0 3 * * 1,4' 
 
+# ECCO LA CHIAVE CHE MANCAVA: Diamo al bot il permesso di salvare i file!
+permissions:
+  contents: write
+
 jobs:
   scout-immobili:
     runs-on: ubuntu-latest
@@ -31,10 +35,8 @@ jobs:
           git config --global user.name "GECO Scraper Bot"
           git config --global user.email "bot@geco.local"
           
-          # Verifica se ci sono state modifiche ai file tracciati o se ci sono file non tracciati
           if [[ -n $(git status -s) ]]; then
             echo "Modifiche rilevate. Procedo al salvataggio..."
-            # Aggiunge tutti i file modificati o nuovi nella directory corrente
             git add -A
             git commit -m "Aggiornamento Database Immobili Padova"
             git push
