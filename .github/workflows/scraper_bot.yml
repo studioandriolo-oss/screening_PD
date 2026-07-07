@@ -31,12 +31,13 @@ jobs:
           git config --global user.name "GECO Scraper Bot"
           git config --global user.email "bot@geco.local"
           
-          # Controlla se il file esiste prima di fare il commit
-          if test -f "annunci_padova.csv"; then
-            echo "File trovato. Procedo al salvataggio..."
-            git add annunci_padova.csv
-            git commit -m "Aggiornamento Database Immobili Padova" || echo "Nessun dato variato"
+          # Verifica se ci sono state modifiche ai file tracciati o se ci sono file non tracciati
+          if [[ -n $(git status -s) ]]; then
+            echo "Modifiche rilevate. Procedo al salvataggio..."
+            # Aggiunge tutti i file modificati o nuovi nella directory corrente
+            git add -A
+            git commit -m "Aggiornamento Database Immobili Padova"
             git push
           else
-            echo "ATTENZIONE: Il file annunci_padova.csv non è stato creato. Possibile blocco anti-bot o nessun annuncio trovato."
+            echo "Nessun dato variato o file CSV non creato. Skip del commit."
           fi
