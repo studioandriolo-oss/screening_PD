@@ -17,25 +17,34 @@ def generate_pdf_report(row, params):
     
     # --- FUNZIONI DI FORMATTAZIONE INTERNE AL PDF ---
     def fmt(val):
-        if pd.isna(val): return "N/A"
+        if pd.isna(val) or val == float('inf') or val == float('-inf'): return "N/A"
         return f"{val:,.0f} Euro".replace(",", ".")
         
     def fmt_perc(val):
         return f"{val*100:.1f}%"
 
-    # Funzione per disegnare le righe della tabella
-    def add_row(label, formula, result, is_total=False):
+    # --- NUOVO GENERATORE DI RIGHE (Supporta l'incidenza al mq nella stessa "cella" visiva) ---
+    def add_row(label, formula, result, is_total=False, incidenza=None):
         pdf.set_font("Arial", 'B' if is_total else '', 11 if is_total else 10)
-        # Sfondo grigio per i totali
-        if is_total:
+        fill = is_total
+        if fill:
             pdf.set_fill_color(240, 240, 240)
-            fill = True
-        else:
-            fill = False
             
         testo_sx = f"{label} = {formula}" if formula else label
-        pdf.cell(140, 8, txt=testo_sx, border=1, fill=fill)
-        pdf.cell(50, 8, txt=result, border=1, ln=True, align='R', fill=fill)
+        
+        if incidenza:
+            # Riga superiore (disegna i bordi Sinistra, Sopra, Destra - LTR)
+            pdf.cell(140, 6, txt=testo_sx, border="LTR", fill=fill)
+            pdf.cell(50, 6, txt=result, border="LTR", ln=True, align='R', fill=fill)
+            
+            # Riga inferiore per l'incidenza (corsivo, più piccolo, bordi Sinistra, Sotto, Destra - LBR)
+            pdf.set_font("Arial", 'I', 9)
+            pdf.cell(140, 5, txt="", border="LBR", fill=fill)
+            pdf.cell(50, 5, txt=f"({incidenza} / mq)", border="LBR", ln=True, align='R', fill=fill)
+        else:
+            # Riga standard (bordo completo 1)
+            pdf.cell(140, 8, txt=testo_sx, border=1, fill=fill)
+            pdf.cell(50, 8, txt=result, border=1, ln=True, align='R', fill=fill)
 
     # --- TITOLO ---
     pdf.set_font("Arial", 'B', 16)
@@ -45,10 +54,11 @@ def generate_pdf_report(row, params):
     pdf.ln(2)
     
     # --- 1. DATI IMMOBILE ---
+    mq = row['Superficie']
     pdf.set_font("Arial", 'B', 12)
     pdf.cell(190, 8, txt="1. DATI IMMOBILE", ln=True)
     pdf.set_font("Arial", '', 10)
-    pdf.cell(190, 6, txt=f"Superficie: {row['Superficie']} mq", ln=True)
+    pdf.cell(190, 6, txt=f"Superficie: {mq} mq", ln=True)
     pdf.cell(190, 6, txt=f"Prezzo Richiesto: {fmt(row['Prezzo_J'])}", ln=True)
     
     link_txt = row['Link'] if isinstance(row['Link'], str) else "N/A"
@@ -75,6 +85,12 @@ def generate_pdf_report(row, params):
     pdf.set_font("Arial", 'B', 12)
     pdf.cell(190, 8, txt="3. BREAKDOWN FINANZIARIO", ln=True)
     
+    # Calcolo Incidenze per i totali
+    inc_acq = fmt(row['Costo_Acquisto_Totale'] / mq) if mq > 0 else "N/A"
+    inc_ristr = fmt(row['Costo_Ristr_Totale'] / mq) if mq > 0 else "N/A"
+    inc_ven = fmt(row['Incidenza_MQ'])
+    inc_utile = fmt(row['Utile_Lordo'] / mq) if mq > 0 else "N/A"
+
     # --- SEZIONE: COSTI ACQUISTO ---
     imposta_val = row['Prezzo_J'] * params['imposta']
     agenzia_acq_val = row['Prezzo_J'] * params['agenzia_acq']
@@ -83,9 +99,8 @@ def generate_pdf_report(row, params):
     add_row("Imposta di Registro", f"{fmt(row['Prezzo_J'])} * {fmt_perc(params['imposta'])}", fmt(imposta_val))
     add_row("Spese Notarili", "Quota fissa", fmt(params['notaio']))
     add_row("Agenzia Acquisto", f"{fmt(row['Prezzo_J'])} * {fmt_perc(params['agenzia_acq'])}", fmt(agenzia_acq_val))
-    add_row("COSTO ACQUISTO TOTALE", "", fmt(row['Costo_Acquisto_Totale']), is_total=True)
+    add_row("COSTO ACQUISTO TOTALE", "", fmt(row['Costo_Acquisto_Totale']), is_total=True, incidenza=inc_acq)
     
-    # Spazio vuoto tra le tabelle
     pdf.cell(190, 4, txt="", ln=True)
     
     # --- SEZIONE: COSTI RISTRUTTURAZIONE ---
@@ -93,28 +108,24 @@ def generate_pdf_report(row, params):
     tecnici_val = costo_ristr_base * params['tecnici']
     imprevisti_val = costo_ristr_base * params['imprevisti']
     
-    add_row("Lavori Base (mq)", f"{row['Superficie']} mq * {fmt(params['costo_mq'])}", fmt(costo_ristr_base))
+    add_row("Lavori Base (mq)", f"{mq} mq * {fmt(params['costo_mq'])}", fmt(costo_ristr_base))
     add_row("Costi Tecnici", f"{fmt(costo_ristr_base)} * {fmt_perc(params['tecnici'])}", fmt(tecnici_val))
     add_row("Imprevisti", f"{fmt(costo_ristr_base)} * {fmt_perc(params['imprevisti'])}", fmt(imprevisti_val))
-    add_row("COSTO RISTRUTTURAZIONE TOTALE", "", fmt(row['Costo_Ristr_Totale']), is_total=True)
+    add_row("COSTO RISTRUTTURAZIONE TOTALE", "", fmt(row['Costo_Ristr_Totale']), is_total=True, incidenza=inc_ristr)
     
-    # Spazio vuoto tra le tabelle
     pdf.cell(190, 4, txt="", ln=True)
     
     # --- SEZIONE: VENDITA E UTILE ---
     agenzia_ven_val = row['Ipotesi_Vendita_U'] * params['agenzia_ven']
     interessi_val = row['Costo_Acquisto_Totale'] * params['interessi']
-    
-    # Il target si basa sulla somma di Acq + Ristr rivalutata del Plusvalore
     somma_costi = row['Costo_Acquisto_Totale'] + row['Costo_Ristr_Totale']
     
-    add_row("TARGET VENDITA", f"Costi ({fmt(somma_costi)}) + {fmt_perc(params['plusvalore'])}", fmt(row['Ipotesi_Vendita_U']))
+    add_row("TARGET VENDITA LORDO", f"Costi ({fmt(somma_costi)}) + {fmt_perc(params['plusvalore'])}", fmt(row['Ipotesi_Vendita_U']), is_total=True, incidenza=inc_ven)
     add_row("Agenzia Vendita (-)", f"{fmt(row['Ipotesi_Vendita_U'])} * {fmt_perc(params['agenzia_ven'])}", fmt(agenzia_ven_val))
     add_row("Interessi Passivi (-)", f"Acquisto ({fmt(row['Costo_Acquisto_Totale'])}) * {fmt_perc(params['interessi'])}", fmt(interessi_val))
     
-    # Spazio per staccare l'utile finale
     pdf.cell(190, 2, txt="", ln=True)
-    add_row("UTILE LORDO FINALE", "Vendita - Acq. - Ristr. - Oneri", fmt(row['Utile_Lordo']), is_total=True)
+    add_row("UTILE LORDO FINALE", "Vendita - Acq. - Ristr. - Oneri", fmt(row['Utile_Lordo']), is_total=True, incidenza=inc_utile)
     
     return bytes(pdf.output(dest="S"))
     
