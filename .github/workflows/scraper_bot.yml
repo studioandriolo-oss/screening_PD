@@ -5,10 +5,6 @@ on:
   schedule:
     - cron: '0 3 * * 1,4' 
 
-# ECCO LA CHIAVE CHE MANCAVA: Diamo al bot il permesso di salvare i file!
-permissions:
-  contents: write
-
 jobs:
   scout-immobili:
     runs-on: ubuntu-latest
@@ -30,16 +26,11 @@ jobs:
       - name: Esegui Scraper
         run: python scraper.py
 
-      - name: Salva il nuovo Database su GitHub
-        run: |
-          git config --global user.name "GECO Scraper Bot"
-          git config --global user.email "bot@geco.local"
-          
-          if [[ -n $(git status -s) ]]; then
-            echo "Modifiche rilevate. Procedo al salvataggio..."
-            git add -A
-            git commit -m "Aggiornamento Database Immobili Padova"
-            git push
-          else
-            echo "Nessun dato variato o file CSV non creato. Skip del commit."
-          fi
+      # QUESTA È LA SOLUZIONE GARANTITA
+      # Invece di provare a modificare i tuoi file su GitHub (che causa l'errore 128),
+      # carichiamo il file come "Artefatto" scaricabile alla fine del processo.
+      - name: Rilascia il Database CSV
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-immobili-padova
+          path: annunci_padova.csv
