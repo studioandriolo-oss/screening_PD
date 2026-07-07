@@ -222,6 +222,13 @@ try:
     # Carica i dati estratti dal motore di scraping
     df = pd.read_csv("annunci_padova.csv", encoding="utf-8")
     
+    # PULIZIA DATI: Evitiamo crash e settiamo "N.C." dove manca la zona
+    if 'Indirizzo' not in df.columns:
+        df['Indirizzo'] = "N.C."
+    
+    df['Zona'] = df['Zona'].fillna("N.C.").replace(["", "Non Specificata", "non specificata"], "N.C.")
+    df['Indirizzo'] = df['Indirizzo'].fillna("N.C.")
+    
     # Aggiorna dinamicamente i filtri della sidebar basandosi sui dati realmente presenti nel DB
     lista_comuni = sorted(df['Comune'].unique().tolist())
     lista_zone = sorted(df['Zona'].unique().tolist())
@@ -231,6 +238,7 @@ except FileNotFoundError:
     data_fallback = {
         'Comune': ['Padova', 'Padova', 'Padova'],
         'Zona': ['Centro Storico', 'Guizza', 'Portello'],
+        'Indirizzo': ['N.C.', 'N.C.', 'N.C.'],
         'Tipologia': ['Residenziale', 'Residenziale', 'Residenziale'],
         'Superficie': [100, 85, 70],
         'Prezzo_J': [150000, 120000, 95000],
@@ -239,6 +247,10 @@ except FileNotFoundError:
     df = pd.DataFrame(data_fallback)
     lista_comuni = ["Padova"]
     lista_zone = ["Centro Storico", "Guizza", "Portello"]
+
+# -----------------------------------------
+# MOTORE DI CALCOLO PANDAS
+# -----------------------------------------
 
 # -----------------------------------------
 # MOTORE DI CALCOLO PANDAS
