@@ -4,121 +4,131 @@ import random
 import pandas as pd
 from playwright.sync_api import sync_playwright
 
+# ---------------------------------------------------------
+# 1. FUNZIONI DI PULIZIA DATI
+# ---------------------------------------------------------
 def pulisci_prezzo(testo_prezzo):
-    """Estrae il numero puro dal testo del prezzo (es. '€ 150.000' -> 150000)"""
-    if not testo_prezzo or "asta" in testo_prezzo.lower():
+    if not testo_prezzo or "trattativa" in testo_prezzo.lower() or "asta" in testo_prezzo.lower():
         return None
     try:
-        # Rimuove simboli e punti delle migliaia
-        puro = testo_prezzo.replace("€", "").replace(".", "").strip()
-        return float(puro)
-    except ValueError:
+        puro = testo_prezzo.replace("€", "").replace(".", "").replace(",00", "").strip()
+        # Estrae solo i numeri usando la list comprehension
+        puro = ''.join(c for c in puro if c.isdigit())
+        return float(puro) if puro else None
+    except:
         return None
 
 def pulisci_superficie(testo_sup):
-    """Estrae i mq puri (es. '100 m²' -> 100)"""
     if not testo_sup:
         return None
     try:
         puro = testo_sup.lower().replace("m²", "").replace("mq", "").strip()
-        return int(puro)
-    except ValueError:
+        puro = ''.join(c for c in puro if c.isdigit())
+        return int(puro) if puro else None
+    except:
         return None
 
-def esegui_scouting_padova(max_pagine=3):
+# ---------------------------------------------------------
+# 2. DIZIONARIO DELLE AGENZIE (La Mappa dei Selettori CSS)
+# ---------------------------------------------------------
+# NOTA: I selettori CSS (es. '.property-card') andranno calibrati guardando il codice sorgente 
+# reale dei vari siti. Questa è l'architettura pronta per ospitarli.
+AGENZIE = [
+    {
+        "nome": "Engel & Volkers Padova",
+        "url": "https://www.engelvoelkers.com/it-it/padova/comprare/",
+        "selettori": {
+            "card": "div.property-card", # Il contenitore del singolo annuncio
+            "link": "a.property-card-link", # Dove si trova il link (href)
+            "prezzo": "div.price",          # Dove si trova il testo del prezzo
+            "mq": "div.living-space"        # Dove si trova il testo dei mq
+        }
+    },
+    {
+        "nome": "Agenzia Locale Standard (Test)",
+        "url": "https://example.com/immobili-padova", # Placeholder per le agenzie locali
+        "selettori": {
+            "card": ".listing-item",
+            "link": "a.listing-link",
+            "prezzo": ".price-text",
+            "mq": ".area-text"
+        }
+    }
+]
+
+# ---------------------------------------------------------
+# 3. IL MOTORE DI ESTRAZIONE
+# ---------------------------------------------------------
+def esegui_scouting_multiplo():
     risultati = []
     
-    # URL base per la ricerca di case in vendita a Padova
-    # Modificabile per estendere alla provincia o a tipologie commerciali
-    url_base = "https://www.immobiliare.it/vendita-case/padova/?criterio=rilevanza"
-
     with sync_playwright() as p:
-        # Lancio del browser con configurazioni per ridurre il rilevamento anti-bot
-        browser = p.chromium.launch(
-            headless=True, # Cambiare in False per vedere il browser in azione in locale
-            args=["--disable-blink-features=AutomationControlled"]
-        )
-        
+        # Avviamo il browser. Senza protezioni militari, passiamo in scioltezza.
+        browser = p.chromium.launch(headless=True)
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            viewport={"width": 1920, "height": 1080}
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         )
-        
         page = context.new_page()
         
-        for pagina in range(1, max_pagine + 1):
-            url_corrente = f"{url_base}&pag={pagina}" if pagina > 1 else url_base
-            print(f"Esplorazione pagina {pagina}: {url_corrente}")
+        for agenzia in AGENZIE:
+            print(f"Scansione agenzia: {agenzia['nome']}")
             
             try:
-                page.goto(url_corrente, timeout=60000)
-                # Attesa casuale per simulare la lettura umana
-                time.sleep(random.uniform(3.0, 6.0))
+                # Naviga al sito dell'agenzia
+                page.goto(agenzia['url'], timeout=45000)
+                time.sleep(random.uniform(2.0, 4.0)) # Attesa umana
                 
-                # Gestione iniziale dei cookie se presenti
-                if pagina == 1:
-                    bottone_cookie = page.locator("button:has-text('Accetta'), button:has-text('Acconsento')").first
-                    if bottone_cookie.is_visible():
-                        bottone_cookie.click()
-                        time.sleep(1)
-
-                # Selettore delle card dei singoli annunci (struttura standard dei portali)
-                annunci = page.locator("li.in-reListCard").all()
+                # Identifica tutti gli annunci sulla pagina usando il selettore 'card'
+                cards = page.locator(agenzia['selettori']['card']).all()
+                print(f"Trovati {len(cards)} annunci potenziali.")
                 
-                if not annunci:
-                    print("Nessun annuncio trovato. Possibile blocco o cambio layout.")
-                    break
-                    
-                for annuncio in annunci:
+                for card in cards:
                     try:
-                        # Estrazione Link e Titolo (contiene la zona)
-                        link_elemento = annuncio.locator("a.in-reListCard__title").first
-                        link = link_elemento.get_attribute("href")
-                        titolo = link_elemento.text_content().strip()
-                        
+                        # Estrazione Link
+                        el_link = card.locator(agenzia['selettori']['link']).first
+                        link = el_link.get_attribute("href")
+                        # Se il link è relativo (es. /immobile/123), aggiungiamo la radice del sito
+                        if link and link.startswith("/"):
+                            dominio = "/".join(agenzia['url'].split("/")[:3])
+                            link = dominio + link
+                            
                         # Estrazione Prezzo
-                        prezzo_testo = annuncio.locator(".in-reListCard__price").text_content().strip()
-                        prezzo = pulisci_prezzo(prezzo_testo)
+                        el_prezzo = card.locator(agenzia['selettori']['prezzo']).first
+                        prezzo = pulisci_prezzo(el_prezzo.text_content()) if el_prezzo.is_visible() else None
                         
-                        # Estrazione Superficie
-                        # Spesso i dettagli sono in liste con icone, cerchiamo il testo con 'm²'
-                        sup_elemento = annuncio.locator("li:has-text('m²')").first
-                        superficie = pulisci_superficie(sup_elemento.text_content()) if sup_elemento.is_visible() else None
+                        # Estrazione Mq
+                        el_mq = card.locator(agenzia['selettori']['mq']).first
+                        superficie = pulisci_superficie(el_mq.text_content()) if el_mq.is_visible() else None
                         
-                        # Analisi euristica della zona dal titolo (es. 'Appartamento in Centro Storico, Padova')
-                        zona = "Non Specificata"
-                        if "in " in titolo:
-                            parti = titolo.split("in ")[1].split(",")
-                            if parti:
-                                zona = parti[0].strip()
-                        
-                        # Salviamo solo se abbiamo i dati fondamentali per il calcolo finanziario
                         if prezzo and superficie and link:
                             risultati.append({
                                 'Comune': 'Padova',
-                                'Zona': zona,
+                                'Zona': 'Centro Storico (Agenzia)', # Da affinare in base al sito
                                 'Tipologia': 'Residenziale',
                                 'Superficie': superficie,
                                 'Prezzo_J': prezzo,
-                                'Link': link
+                                'Link': link,
+                                'Fonte': agenzia['nome'] # Tracciamo da quale agenzia arriva
                             })
                     except Exception as e:
-                        # Salta l'annuncio singolo se corrotto, per non bloccare il ciclo
-                        continue
+                        continue # Salta l'annuncio se la struttura è rotta
                         
             except Exception as e:
-                print(f"Errore durante lo scaricamento della pagina {pagina}: {e}")
-                break
+                print(f"Errore connessione a {agenzia['nome']}: {e}")
                 
         browser.close()
         
-    # Conversione in DataFrame e salvataggio
+    # ---------------------------------------------------------
+    # 4. SALVATAGGIO DATI
+    # ---------------------------------------------------------
     df_scout = pd.DataFrame(risultati)
     if not df_scout.empty:
+        # Se esiste un database precedente, possiamo decidere se sovrascriverlo o appenderlo.
+        # Per ora lo sovrascriviamo per avere sempre la fotografia attuale.
         df_scout.to_csv("annunci_padova.csv", index=False, encoding="utf-8")
         print(f"Scouting completato. Salvati {len(df_scout)} immobili in 'annunci_padova.csv'")
     else:
-        print("Nessun dato raccolto.")
+        print("Nessun dato raccolto valido. Controllare i selettori CSS.")
 
 if __name__ == "__main__":
-    esegui_scouting_padova(max_pagine=3)
+    esegui_scouting_multiplo()
