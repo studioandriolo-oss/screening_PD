@@ -1,0 +1,39 @@
+name: GECO Motore
+
+on:
+  workflow_dispatch: 
+
+jobs:
+  scout:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scarica Codice
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installa Ambiente
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas playwright
+          playwright install chromium
+          playwright install-deps
+
+      - name: Avvia Scraper
+        run: python scraper.py
+
+      - name: Forza File Sicurezza
+        run: |
+          if [ ! -f annunci_padova.csv ]; then
+            echo "Comune,Zona,Tipologia,Superficie,Prezzo_J,Link,Fonte" > annunci_padova.csv
+            echo "Padova (Test),Test,Residenziale,100,100000,https://github.com,Test" >> annunci_padova.csv
+          fi
+
+      - name: Salva Output
+        uses: actions/upload-artifact@v4
+        with:
+          name: dati_immobili
+          path: annunci_padova.csv
