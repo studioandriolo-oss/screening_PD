@@ -17,6 +17,8 @@ def generate_pdf_report(row, params):
     pdf.add_page()
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, txt=f"Report Immobiliare: {row['Comune']} - {row['Zona']}", ln=True, align='C')
+    acquisto_txt = format_euro(row['Prezzo_J']).replace("€", "Euro")
+    utile_txt = format_euro(row['Utile_Lordo']).replace("€", "Euro")
     pdf.cell(200, 10, txt=f"Acquisto: {format_euro(row['Prezzo_J'])}", ln=True, align='C')
     pdf.cell(200, 10, txt=f"Utile Lordo Stimato: {format_euro(row['Utile_Lordo'])}", ln=True, align='C')
     return pdf.output(dest="S").encode("latin1")
