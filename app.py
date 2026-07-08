@@ -132,6 +132,18 @@ try:
     df['Zona'] = df['Zona'].fillna("N.C.").replace(["", "Non Specificata", "non specificata"], "N.C.")
     df['Indirizzo'] = df['Indirizzo'].fillna("N.C.")
     
+    # NOVITÀ: Motore di classificazione semantica dello stato immobile
+    def classifica_stato(testo):
+        testo = str(testo).lower()
+        if any(k in testo for k in ['nuov', 'ristrutturat', 'restaurat', 'ottimo', 'finit']):
+            return 'Nuovo/Ristrutturato'
+        elif any(k in testo for k in ['da ristrutturare', 'da riattare', 'rudere', 'costruire']):
+            return 'Da Ristrutturare'
+        else:
+            return 'Usato/Medio'
+            
+    df['Stato_Stimato'] = df['Indirizzo'].apply(classifica_stato)
+    
     lista_comuni = sorted(df['Comune'].unique().tolist())
     lista_zone = sorted(df['Zona'].unique().tolist())
     
@@ -284,22 +296,35 @@ else:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # -----------------------------------------
-# 7. BENCHMARK DI MERCATO
+# 7. BENCHMARK DI MERCATO (Comparabili Reali)
 # -----------------------------------------
 if not df_geo_filtered.empty:
-    df_geo_calculated = calculate_metrics(df_geo_filtered)
-    prezzo_medio_richiesta = df_geo_calculated['Prezzo_J'].mean()
-    prezzo_medio_vendita = df_geo_calculated['Ipotesi_Vendita_U'].mean()
-    prezzo_medio_mq_richiesta = (df_geo_calculated['Prezzo_J'] / df_geo_calculated['Superficie']).mean()
-    prezzo_medio_mq_vendita = (df_geo_calculated['Ipotesi_Vendita_U'] / df_geo_calculated['Superficie']).mean()
+    # Separiamo il mercato in base alla classificazione testuale
+    df_acquisizione = df_geo_filtered[df_geo_filtered['Stato_Stimato'].isin(['Da Ristrutturare', 'Usato/Medio'])]
+    df_competitors = df_geo_filtered[df_geo_filtered['Stato_Stimato'] == 'Nuovo/Ristrutturato']
     
-    st.markdown("### Benchmark Target Area (Basato sul Plusvalore)")
-    st.write(f"*Dato calcolato sui filtri geografici e tipologia, escludendo il range di prezzo di ricerca.*")
+    # Protezione matematica: se in zona sono tutte case nuove o tutte vecchie
+    if df_acquisizione.empty: 
+        df_acquisizione = df_geo_filtered
+        
+    prezzo_medio_mq_richiesta = (df_acquisizione['Prezzo_J'] / df_acquisizione['Superficie']).mean()
+    
+    # Calcolo reale del target di uscita basato sui competitor
+    if not df_competitors.empty:
+        prezzo_medio_mq_vendita_reale = (df_competitors['Prezzo_J'] / df_competitors['Superficie']).mean()
+        nota_vendita = f"Basato su {len(df_competitors)} immobili nuovi/ristrutturati in zona."
+    else:
+        # Fallback: se non c'è nessun immobile nuovo nel quartiere, usa la proiezione matematica
+        df_geo_calc = calculate_metrics(df_geo_filtered)
+        prezzo_medio_mq_vendita_reale = (df_geo_calc['Ipotesi_Vendita_U'] / df_geo_calc['Superficie']).mean()
+        nota_vendita = "Nessun immobile nuovo trovato. Dato proiettato sui tuoi costi."
+        
+    st.markdown("### 📊 Benchmark di Quartiere (Analisi Comparativa Reale)")
     
     col_bench1, col_bench2 = st.columns(2)
     with col_bench1:
-        st.markdown(f"**Acquisto (Media Richiesta)**<br><span style='font-size: 1.2rem;'>**{format_euro(prezzo_medio_mq_richiesta)} / mq**</span><br><span style='font-size: 0.9rem; color: #a1a1aa;'>Totale medio: {format_euro(prezzo_medio_richiesta)}</span>", unsafe_allow_html=True)
+        st.markdown(f"**Valore Medio Acquisizione (Da Ristrutturare/Usato)**<br><span style='font-size: 1.3rem; color: #f59e0b;'>**{format_euro(prezzo_medio_mq_richiesta)} / mq**</span>", unsafe_allow_html=True)
     with col_bench2:
-        st.markdown(f"**Target Vendita (Finito)**<br><span style='font-size: 1.2rem; color: #10b981;'>**{format_euro(prezzo_medio_mq_vendita)} / mq**</span><br><span style='font-size: 0.9rem; color: #a1a1aa;'>Totale medio: {format_euro(prezzo_medio_vendita)}</span>", unsafe_allow_html=True)
+        st.markdown(f"**Valore Medio Vendita (Nuovo/Ristrutturato)**<br><span style='font-size: 1.3rem; color: #10b981;'>**{format_euro(prezzo_medio_mq_vendita_reale)} / mq**</span><br><span style='font-size: 0.85rem; color: #a1a1aa;'>{nota_vendita}</span>", unsafe_allow_html=True)
 else:
     st.warning("Dati insufficienti nell'area selezionata per calcolare il benchmark di mercato.")
