@@ -313,17 +313,19 @@ if not df_geo_filtered.empty:
             prezzo_acq_mercato = df_valid['Incidenza_Reale'].quantile(0.25)
             prezzo_ven_mercato = df_valid['Incidenza_Reale'].quantile(0.75)
             nota_stat = f"Campione limitato ({len(df_valid)} immobili in zona). Modello a quartili puri per evitare distorsioni statistiche."
-        else:
-            # 3. Matrice Ibrida: Testo + Taglio degli estremi anomali
-            # Sterilizziamo l'usato tagliando d'ufficio il 25% più costoso
-            q75_acq = df_acquisizione['Incidenza_Reale'].quantile(0.75)
-            prezzo_acq_mercato = df_acquisizione[df_acquisizione['Incidenza_Reale'] <= q75_acq]['Incidenza_Reale'].median()
+       else:
+            # 3. Matrice Ibrida: Testo + Logica da Investitore (Fascia Bassa)
             
-            # Sterilizziamo il nuovo tagliando d'ufficio il 25% più economico
+            # ACQUISIZIONE: Non usiamo più la mediana dell'usato (che include case abitabili e care).
+            # Puntiamo direttamente al 25° percentile dell'usato: il limite del quarto più economico del mercato,
+            # che intercetta i veri immobili "Da Ristrutturare" ignorando il resto.
+            prezzo_acq_mercato = df_acquisizione['Incidenza_Reale'].quantile(0.25)
+            
+            # VENDITA: Sterilizziamo il nuovo tagliando d'ufficio il 25% più economico (finti nuovi o prezzi civetta)
             q25_ven = df_competitors['Incidenza_Reale'].quantile(0.25)
             prezzo_ven_mercato = df_competitors[df_competitors['Incidenza_Reale'] >= q25_ven]['Incidenza_Reale'].median()
             
-            nota_stat = f"Matrice Ibrida su {len(df_valid)} immobili: classifica il mercato tramite testo e sterilizza i dati tagliando i percentili estremi (esclude il 25% più costoso dall'usato e il 25% più economico dal nuovo), eliminando matematicamente finto lusso e prezzi civetta."
+            nota_stat = f"Matrice Ibrida su {len(df_valid)} immobili: Target Acquisizione centrato sul 25° percentile dell'usato (isolo matematicamente i veri immobili da ristrutturare). Target Vendita depurato dai falsi positivi a basso costo."
 
         st.markdown("### 📊 Benchmark di Quartiere (Distribuzione Reale)")
         st.markdown(f"<span style='font-size: 0.9rem; color: #a1a1aa;'>{nota_stat}</span>", unsafe_allow_html=True)
