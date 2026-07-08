@@ -232,8 +232,11 @@ def calculate_metrics(df_calc):
 # -----------------------------------------
 st.write("### Risultati Analisi")
 
-mask_geo = df['Comune'].isin(comune) & df['Zona'].isin(zona) & (df['Tipologia'] == tipologia)
-df_geo_filtered = df[mask_geo].copy()
+# IL FILTRO SALVAVITA: Scarta gli annunci incompleti (i "nan") prima di fare i calcoli
+df_clean = df.dropna(subset=['Superficie', 'Prezzo_J'])
+
+mask_geo = df_clean['Comune'].isin(comune) & df_clean['Zona'].isin(zona) & (df_clean['Tipologia'] == tipologia)
+df_geo_filtered = df_clean[mask_geo].copy()
 mask_price = (df_geo_filtered['Prezzo_J'] >= prezzo_range[0]) & (df_geo_filtered['Prezzo_J'] <= prezzo_range[1])
 df_final_filtered = df_geo_filtered[mask_price].copy()
 
