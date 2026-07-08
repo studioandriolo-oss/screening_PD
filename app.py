@@ -242,7 +242,6 @@ def calculate_metrics(df_calc):
 # -----------------------------------------
 st.write("### Risultati Analisi")
 
-# Scarta "nan" per non rompere la matematica
 df_clean = df.dropna(subset=['Superficie', 'Prezzo_J'])
 
 mask_geo = df_clean['Comune'].isin(comune) & df_clean['Zona'].isin(zona) & (df_clean['Tipologia'] == tipologia)
@@ -294,34 +293,24 @@ else:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # -----------------------------------------
-# 7. BENCHMARK DI MERCATO (Matrice Ibrida)
+# 7. BENCHMARK DI MERCATO (Matrice Ibrida Aggiornata)
 # -----------------------------------------
 if not df_geo_filtered.empty:
-    # FILTRO PULIZIA: Escludiamo gli "annunci civetta" o errati
     df_valid = df_geo_filtered[(df_geo_filtered['Superficie'] > 10) & (df_geo_filtered['Prezzo_J'] > 10000)].copy()
     
     if not df_valid.empty:
-        # Calcoliamo l'incidenza al mq reale per tutti gli immobili validi
         df_valid['Incidenza_Reale'] = df_valid['Prezzo_J'] / df_valid['Superficie']
         
-        # 1. Divisione Semantica
         df_acquisizione = df_valid[df_valid['Stato_Stimato'].isin(['Da Ristrutturare', 'Usato/Medio'])]
         df_competitors = df_valid[df_valid['Stato_Stimato'] == 'Nuovo/Ristrutturato']
         
-        # 2. Rete di Sicurezza: Pochi dati? Torniamo alla statistica pura
         if len(df_valid) < 5 or df_acquisizione.empty or df_competitors.empty:
             prezzo_acq_mercato = df_valid['Incidenza_Reale'].quantile(0.25)
             prezzo_ven_mercato = df_valid['Incidenza_Reale'].quantile(0.75)
             nota_stat = f"Campione limitato ({len(df_valid)} immobili in zona). Modello a quartili puri per evitare distorsioni statistiche."
-       else:
-            # 3. Matrice Ibrida: Testo + Logica da Investitore (Fascia Bassa)
-            
-            # ACQUISIZIONE: Non usiamo più la mediana dell'usato (che include case abitabili e care).
-            # Puntiamo direttamente al 25° percentile dell'usato: il limite del quarto più economico del mercato,
-            # che intercetta i veri immobili "Da Ristrutturare" ignorando il resto.
+        else:
             prezzo_acq_mercato = df_acquisizione['Incidenza_Reale'].quantile(0.25)
             
-            # VENDITA: Sterilizziamo il nuovo tagliando d'ufficio il 25% più economico (finti nuovi o prezzi civetta)
             q25_ven = df_competitors['Incidenza_Reale'].quantile(0.25)
             prezzo_ven_mercato = df_competitors[df_competitors['Incidenza_Reale'] >= q25_ven]['Incidenza_Reale'].median()
             
