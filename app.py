@@ -294,7 +294,7 @@ else:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # -----------------------------------------
-# 7. BENCHMARK DI MERCATO (Analisi per Quartili)
+# 7. BENCHMARK DI MERCATO (Matrice Ibrida)
 # -----------------------------------------
 if not df_geo_filtered.empty:
     # FILTRO PULIZIA: Escludiamo gli "annunci civetta" o errati
@@ -304,23 +304,35 @@ if not df_geo_filtered.empty:
         # Calcoliamo l'incidenza al mq reale per tutti gli immobili validi
         df_valid['Incidenza_Reale'] = df_valid['Prezzo_J'] / df_valid['Superficie']
         
-        # APPROCCIO MATEMATICO: Calcolo dei Quartili (Percentili)
-        # 25° Percentile: Il limite superiore del 25% più economico (Mercato Acquisizione)
-        prezzo_acq_mercato = df_valid['Incidenza_Reale'].quantile(0.25)
+        # 1. Divisione Semantica
+        df_acquisizione = df_valid[df_valid['Stato_Stimato'].isin(['Da Ristrutturare', 'Usato/Medio'])]
+        df_competitors = df_valid[df_valid['Stato_Stimato'] == 'Nuovo/Ristrutturato']
         
-        # 75° Percentile: La soglia del 25% più caro (Mercato Vendita / Nuovo)
-        prezzo_ven_mercato = df_valid['Incidenza_Reale'].quantile(0.75)
-        
-        nota_stat = f"Basato sulla distribuzione statistica di {len(df_valid)} immobili in zona."
-        
+        # 2. Rete di Sicurezza: Pochi dati? Torniamo alla statistica pura
+        if len(df_valid) < 5 or df_acquisizione.empty or df_competitors.empty:
+            prezzo_acq_mercato = df_valid['Incidenza_Reale'].quantile(0.25)
+            prezzo_ven_mercato = df_valid['Incidenza_Reale'].quantile(0.75)
+            nota_stat = f"Campione limitato ({len(df_valid)} immobili in zona). Modello a quartili puri per evitare distorsioni statistiche."
+        else:
+            # 3. Matrice Ibrida: Testo + Taglio degli estremi anomali
+            # Sterilizziamo l'usato tagliando d'ufficio il 25% più costoso
+            q75_acq = df_acquisizione['Incidenza_Reale'].quantile(0.75)
+            prezzo_acq_mercato = df_acquisizione[df_acquisizione['Incidenza_Reale'] <= q75_acq]['Incidenza_Reale'].median()
+            
+            # Sterilizziamo il nuovo tagliando d'ufficio il 25% più economico
+            q25_ven = df_competitors['Incidenza_Reale'].quantile(0.25)
+            prezzo_ven_mercato = df_competitors[df_competitors['Incidenza_Reale'] >= q25_ven]['Incidenza_Reale'].median()
+            
+            nota_stat = f"Matrice Ibrida su {len(df_valid)} immobili: classifica il mercato tramite testo, ma sterilizza i dati eliminando matematicamente le anomalie (es. finto usato di lusso o nuovo a prezzi civetta)."
+
         st.markdown("### 📊 Benchmark di Quartiere (Distribuzione Reale)")
-        st.markdown(f"<span style='font-size: 0.9rem; color: #a1a1aa;'>{nota_stat} <i>(Il calcolo utilizza i quartili di mercato per isolare matematicamente le fasce di prezzo, ignorando i titoli fuorvianti degli annunci).</i></span>", unsafe_allow_html=True)
+        st.markdown(f"<span style='font-size: 0.9rem; color: #a1a1aa;'>{nota_stat}</span>", unsafe_allow_html=True)
         
         col_bench1, col_bench2 = st.columns(2)
         with col_bench1:
-            st.markdown(f"**Target Acquisizione (25° Percentile / Da Ristrutturare)**<br><span style='font-size: 1.3rem; color: #f59e0b;'>**{format_euro(prezzo_acq_mercato)} / mq**</span>", unsafe_allow_html=True)
+            st.markdown(f"**Target Acquisizione (Da Ristrutturare/Usato)**<br><span style='font-size: 1.3rem; color: #f59e0b;'>**{format_euro(prezzo_acq_mercato)} / mq**</span>", unsafe_allow_html=True)
         with col_bench2:
-            st.markdown(f"**Target Vendita (75° Percentile / Nuovo-Ristrutturato)**<br><span style='font-size: 1.3rem; color: #10b981;'>**{format_euro(prezzo_ven_mercato)} / mq**</span>", unsafe_allow_html=True)
+            st.markdown(f"**Target Vendita (Nuovo/Ristrutturato)**<br><span style='font-size: 1.3rem; color: #10b981;'>**{format_euro(prezzo_ven_mercato)} / mq**</span>", unsafe_allow_html=True)
     else:
         st.warning("Nessun dato valido rimasto dopo la pulizia (probabili annunci errati).")
 else:
