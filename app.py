@@ -294,38 +294,33 @@ else:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # -----------------------------------------
-# 7. BENCHMARK DI MERCATO
+# 7. BENCHMARK DI MERCATO (Analisi per Quartili)
 # -----------------------------------------
 if not df_geo_filtered.empty:
     # FILTRO PULIZIA: Escludiamo gli "annunci civetta" o errati
     df_valid = df_geo_filtered[(df_geo_filtered['Superficie'] > 10) & (df_geo_filtered['Prezzo_J'] > 10000)].copy()
     
     if not df_valid.empty:
+        # Calcoliamo l'incidenza al mq reale per tutti gli immobili validi
         df_valid['Incidenza_Reale'] = df_valid['Prezzo_J'] / df_valid['Superficie']
         
-        df_acquisizione = df_valid[df_valid['Stato_Stimato'].isin(['Da Ristrutturare', 'Usato/Medio'])]
-        df_competitors = df_valid[df_valid['Stato_Stimato'] == 'Nuovo/Ristrutturato']
+        # APPROCCIO MATEMATICO: Calcolo dei Quartili (Percentili)
+        # 25° Percentile: Il limite superiore del 25% più economico (Mercato Acquisizione)
+        prezzo_acq_mercato = df_valid['Incidenza_Reale'].quantile(0.25)
         
-        if df_acquisizione.empty: 
-            df_acquisizione = df_valid
-            
-        prezzo_medio_mq_richiesta = df_acquisizione['Incidenza_Reale'].median()
+        # 75° Percentile: La soglia del 25% più caro (Mercato Vendita / Nuovo)
+        prezzo_ven_mercato = df_valid['Incidenza_Reale'].quantile(0.75)
         
-        if not df_competitors.empty:
-            prezzo_medio_mq_vendita_reale = df_competitors['Incidenza_Reale'].median()
-            nota_vendita = f"Basato sulla mediana di {len(df_competitors)} immobili nuovi/ristrutturati."
-        else:
-            df_geo_calc = calculate_metrics(df_valid)
-            prezzo_medio_mq_vendita_reale = (df_geo_calc['Ipotesi_Vendita_U'] / df_geo_calc['Superficie']).median()
-            nota_vendita = "Nessun immobile nuovo trovato. Dato proiettato."
-            
-        st.markdown("### 📊 Benchmark di Quartiere (Analisi Comparativa Reale)")
+        nota_stat = f"Basato sulla distribuzione statistica di {len(df_valid)} immobili in zona."
+        
+        st.markdown("### 📊 Benchmark di Quartiere (Distribuzione Reale)")
+        st.markdown(f"<span style='font-size: 0.9rem; color: #a1a1aa;'>{nota_stat} <i>(Il calcolo utilizza i quartili di mercato per isolare matematicamente le fasce di prezzo, ignorando i titoli fuorvianti degli annunci).</i></span>", unsafe_allow_html=True)
         
         col_bench1, col_bench2 = st.columns(2)
         with col_bench1:
-            st.markdown(f"**Valore Mediano Acquisizione (Da Ristrutturare/Usato)**<br><span style='font-size: 1.3rem; color: #f59e0b;'>**{format_euro(prezzo_medio_mq_richiesta)} / mq**</span>", unsafe_allow_html=True)
+            st.markdown(f"**Target Acquisizione (25° Percentile / Da Ristrutturare)**<br><span style='font-size: 1.3rem; color: #f59e0b;'>**{format_euro(prezzo_acq_mercato)} / mq**</span>", unsafe_allow_html=True)
         with col_bench2:
-            st.markdown(f"**Valore Mediano Vendita (Nuovo/Ristrutturato)**<br><span style='font-size: 1.3rem; color: #10b981;'>**{format_euro(prezzo_medio_mq_vendita_reale)} / mq**</span><br><span style='font-size: 0.85rem; color: #a1a1aa;'>{nota_vendita}</span>", unsafe_allow_html=True)
+            st.markdown(f"**Target Vendita (75° Percentile / Nuovo-Ristrutturato)**<br><span style='font-size: 1.3rem; color: #10b981;'>**{format_euro(prezzo_ven_mercato)} / mq**</span>", unsafe_allow_html=True)
     else:
         st.warning("Nessun dato valido rimasto dopo la pulizia (probabili annunci errati).")
 else:
