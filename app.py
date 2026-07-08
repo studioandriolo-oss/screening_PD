@@ -1,9 +1,7 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 from PIL import Image
 from fpdf import FPDF
-import io
 
 # --- FUNZIONI DI FORMATTAZIONE ---
 def format_euro(val):
@@ -132,7 +130,6 @@ try:
     df['Zona'] = df['Zona'].fillna("N.C.").replace(["", "Non Specificata", "non specificata"], "N.C.")
     df['Indirizzo'] = df['Indirizzo'].fillna("N.C.")
     
-    # NOVITÀ: Motore di classificazione semantica dello stato immobile
     def classifica_stato(testo):
         testo = str(testo).lower()
         if any(k in testo for k in ['nuov', 'ristrutturat', 'restaurat', 'ottimo', 'finit']):
@@ -156,7 +153,8 @@ except FileNotFoundError:
         'Tipologia': ['Residenziale', 'Residenziale', 'Residenziale'],
         'Superficie': [100, 85, 70],
         'Prezzo_J': [150000, 120000, 95000],
-        'Link': ['https://www.immobiliare.it', 'https://www.immobiliare.it', 'https://www.immobiliare.it']
+        'Link': ['https://www.immobiliare.it', 'https://www.immobiliare.it', 'https://www.immobiliare.it'],
+        'Stato_Stimato': ['Usato/Medio', 'Da Ristrutturare', 'Nuovo/Ristrutturato']
     }
     df = pd.DataFrame(data_fallback)
     lista_comuni = ["Padova"]
@@ -179,7 +177,7 @@ tipologia = st.sidebar.selectbox("Tipologia", ["Residenziale", "Commerciale", "U
 prezzo_range = st.sidebar.slider("Range Prezzo Ricerca (€)", 0, 1000000, (50000, 300000), step=5000)
 
 st.sidebar.markdown("---")
-st.sidebar.caption("GECO Engine v1.8")
+st.sidebar.caption("GECO Engine v2.0")
 
 # -----------------------------------------
 # 4. MAIN: TARGET RENDIMENTO E PARAMETRI
@@ -240,11 +238,11 @@ def calculate_metrics(df_calc):
     return df_calc
 
 # -----------------------------------------
-# 6. TABELLA RISULTATI CON COLONNA INDIRIZZO
+# 6. TABELLA RISULTATI
 # -----------------------------------------
 st.write("### Risultati Analisi")
 
-# IL FILTRO SALVAVITA: Scarta gli annunci incompleti (i "nan") prima di fare i calcoli
+# Scarta "nan" per non rompere la matematica
 df_clean = df.dropna(subset=['Superficie', 'Prezzo_J'])
 
 mask_geo = df_clean['Comune'].isin(comune) & df_clean['Zona'].isin(zona) & (df_clean['Tipologia'] == tipologia)
@@ -296,45 +294,39 @@ else:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # -----------------------------------------
-# 7. BENCHMARK DI MERCATO (Comparabili Reali)
+# 7. BENCHMARK DI MERCATO
 # -----------------------------------------
 if not df_geo_filtered.empty:
-    # FILTRO PULIZIA: Escludiamo gli "annunci civetta" (es. case inserite a 1 mq o a prezzi irrisori)
+    # FILTRO PULIZIA: Escludiamo gli "annunci civetta" o errati
     df_valid = df_geo_filtered[(df_geo_filtered['Superficie'] > 10) & (df_geo_filtered['Prezzo_J'] > 10000)].copy()
     
-    # Calcoliamo l'incidenza al mq per ogni riga valida
-    df_valid['Incidenza_Reale'] = df_valid['Prezzo_J'] / df_valid['Superficie']
-    
-    # Separiamo il mercato in base alla classificazione testuale
-    df_acquisizione = df_valid[df_valid['Stato_Stimato'].isin(['Da Ristrutturare', 'Usato/Medio'])]
-    df_competitors = df_valid[df_valid['Stato_Stimato'] == 'Nuovo/Ristrutturato']
-    
-    # Protezione matematica: se in zona non c'è usato, prendiamo tutto
-    if df_acquisizione.empty: 
-        df_acquisizione = df_valid
+    if not df_valid.empty:
+        df_valid['Incidenza_Reale'] = df_valid['Prezzo_J'] / df_valid['Superficie']
         
-    # USIAMO LA MEDIANA: ignora matematicamente i valori fuori scala
-    prezzo_medio_mq_richiesta = df_acquisizione['Incidenza_Reale'].median()
-    
-    # Calcolo reale del target di uscita basato sui competitor
-    if not df_competitors.empty:
-        prezzo_medio_mq_vendita_reale = df_competitors['Incidenza_Reale'].median()
-        nota_vendita = f"Basato sulla mediana di {len(df_competitors)} immobili nuovi/ristrutturati."
+        df_acquisizione = df_valid[df_valid['Stato_Stimato'].isin(['Da Ristrutturare', 'Usato/Medio'])]
+        df_competitors = df_valid[df_valid['Stato_Stimato'] == 'Nuovo/Ristrutturato']
+        
+        if df_acquisizione.empty: 
+            df_acquisizione = df_valid
+            
+        prezzo_medio_mq_richiesta = df_acquisizione['Incidenza_Reale'].median()
+        
+        if not df_competitors.empty:
+            prezzo_medio_mq_vendita_reale = df_competitors['Incidenza_Reale'].median()
+            nota_vendita = f"Basato sulla mediana di {len(df_competitors)} immobili nuovi/ristrutturati."
+        else:
+            df_geo_calc = calculate_metrics(df_valid)
+            prezzo_medio_mq_vendita_reale = (df_geo_calc['Ipotesi_Vendita_U'] / df_geo_calc['Superficie']).median()
+            nota_vendita = "Nessun immobile nuovo trovato. Dato proiettato."
+            
+        st.markdown("### 📊 Benchmark di Quartiere (Analisi Comparativa Reale)")
+        
+        col_bench1, col_bench2 = st.columns(2)
+        with col_bench1:
+            st.markdown(f"**Valore Mediano Acquisizione (Da Ristrutturare/Usato)**<br><span style='font-size: 1.3rem; color: #f59e0b;'>**{format_euro(prezzo_medio_mq_richiesta)} / mq**</span>", unsafe_allow_html=True)
+        with col_bench2:
+            st.markdown(f"**Valore Mediano Vendita (Nuovo/Ristrutturato)**<br><span style='font-size: 1.3rem; color: #10b981;'>**{format_euro(prezzo_medio_mq_vendita_reale)} / mq**</span><br><span style='font-size: 0.85rem; color: #a1a1aa;'>{nota_vendita}</span>", unsafe_allow_html=True)
     else:
-        # Fallback: se non c'è nessun immobile nuovo, usa la proiezione matematica
-        df_geo_calc = calculate_metrics(df_valid)
-        prezzo_medio_mq_vendita_reale = (df_geo_calc['Ipotesi_Vendita_U'] / df_geo_calc['Superficie']).median()
-        nota_vendita = "Nessun immobile nuovo trovato. Dato proiettato."
-        
-    st.markdown("### 📊 Benchmark di Quartiere (Analisi Comparativa Reale)")
-    
-    col_bench1, col_bench2 = st.columns(2)
-    with col_bench1:
-        st.markdown(f"**Valore Mediano Acquisizione (Da Ristrutturare/Usato)**<br><span style='font-size: 1.3rem; color: #f59e0b;'>**{format_euro(prezzo_medio_mq_richiesta)} / mq**</span>", unsafe_allow_html=True)
-    with col_bench2:
-        st.markdown(f"**Valore Mediano Vendita (Nuovo/Ristrutturato)**<br><span style='font-size: 1.3rem; color: #10b981;'>**{format_euro(prezzo_medio_mq_vendita_reale)} / mq**</span><br><span style='font-size: 0.85rem; color: #a1a1aa;'>{nota_vendita}</span>", unsafe_allow_html=True)
-else:
-    st.warning("Dati insufficienti nell'area selezionata per calcolare il benchmark di mercato.")
-        st.markdown(f"**Valore Medio Vendita (Nuovo/Ristrutturato)**<br><span style='font-size: 1.3rem; color: #10b981;'>**{format_euro(prezzo_medio_mq_vendita_reale)} / mq**</span><br><span style='font-size: 0.85rem; color: #a1a1aa;'>{nota_vendita}</span>", unsafe_allow_html=True)
+        st.warning("Nessun dato valido rimasto dopo la pulizia (probabili annunci errati).")
 else:
     st.warning("Dati insufficienti nell'area selezionata per calcolare il benchmark di mercato.")
