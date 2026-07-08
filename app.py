@@ -323,7 +323,7 @@ if not df_geo_filtered.empty:
             q25_ven = df_competitors['Incidenza_Reale'].quantile(0.25)
             prezzo_ven_mercato = df_competitors[df_competitors['Incidenza_Reale'] >= q25_ven]['Incidenza_Reale'].median()
             
-            nota_stat = f"Matrice Ibrida su {len(df_valid)} immobili: classifica il mercato tramite testo, ma sterilizza i dati eliminando matematicamente le anomalie (es. finto usato di lusso o nuovo a prezzi civetta)."
+            nota_stat = f"Matrice Ibrida su {len(df_valid)} immobili: classifica il mercato tramite testo e sterilizza i dati tagliando i percentili estremi (esclude il 25% più costoso dall'usato e il 25% più economico dal nuovo), eliminando matematicamente finto lusso e prezzi civetta."
 
         st.markdown("### 📊 Benchmark di Quartiere (Distribuzione Reale)")
         st.markdown(f"<span style='font-size: 0.9rem; color: #a1a1aa;'>{nota_stat}</span>", unsafe_allow_html=True)
